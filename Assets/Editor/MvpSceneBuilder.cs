@@ -40,7 +40,8 @@ public static class MvpSceneBuilder
         }
 
         EditorPrefs.SetBool(AutoKey, true);
-        if (gm.bossPrefab == null || gm.flyerPrefab == null || gm.shooterPrefab == null) AddMissingPrefabs();
+        if (gm.bossPrefab == null || gm.flyerPrefab == null || gm.shooterPrefab == null || gm.gruntPrefab == null || gm.elitePrefab == null)
+            AddMissingPrefabs();
 
         string statsKey = "MvpSceneBuilder.StatsApplied.v1." + Application.dataPath;
         if (!EditorPrefs.GetBool(statsKey, false))
@@ -96,6 +97,8 @@ public static class MvpSceneBuilder
 
             EnsureFolder(PrefabDir);
             var mat = GetNoFrictionMaterial();
+            if (gm.gruntPrefab == null) gm.gruntPrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabDir}/Grunt.prefab");
+            if (gm.elitePrefab == null) gm.elitePrefab = AssetDatabase.LoadAssetAtPath<GameObject>($"{PrefabDir}/Elite.prefab");
             if (gm.bossPrefab == null) gm.bossPrefab = BuildBossPrefab(square, mat);
             if (gm.flyerPrefab == null) gm.flyerPrefab = BuildFlyerPrefab(diamond, mat);
             if (gm.shooterPrefab == null) gm.shooterPrefab = BuildShooterPrefab(square, BuildBulletPrefab(circle), mat);
@@ -156,6 +159,8 @@ public static class MvpSceneBuilder
         gm.bossPrefab = bossPrefab;
         gm.flyerPrefab = flyerPrefab;
         gm.shooterPrefab = shooterPrefab;
+        gm.gruntPrefab = gruntPrefab;
+        gm.elitePrefab = elitePrefab;
 
         BuildLevel(square);
         var player = BuildPlayer(square, noFriction);

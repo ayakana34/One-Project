@@ -4,7 +4,6 @@ using UnityEngine.InputSystem;
 [RequireComponent(typeof(Rigidbody2D), typeof(CapsuleCollider2D))]
 public class Player : MonoBehaviour
 {
-    public const int MaxDashCharges = 2;
 
     const float MoveSpeed = 7f;
     const float JumpSpeed = 13f;
@@ -13,6 +12,7 @@ public class Player : MonoBehaviour
     const float DashTime = 0.15f;
     const float DashRechargeTime = 1.5f;
     const float DashEndInvulnTime = 0.1f;
+    const float RecallCooldown = 4f;
     const float HitInvulnTime = 1f;
     const float DropThroughTime = 0.35f;
 
@@ -20,13 +20,16 @@ public class Player : MonoBehaviour
 
     public int Hp { get; private set; }
     public int MaxHp => stats.maxHp;
-    public int WeaponDamage => stats.ScaledAttack;
+    public int WeaponDamage => stats.attack;
     public bool HasWeapon { get; private set; } = true;
     public bool Dead => Hp <= 0;
     public Collider2D Col => col;
     public bool Invulnerable => Dead || Time.time < dashUntil + DashEndInvulnTime || Time.time < hitInvulnUntil;
     public bool Dashing => Time.time < dashUntil;
-    public int DashCharges { get; private set; } = MaxDashCharges;
+    public bool HasRecall { get; private set; }
+    public float RecallCooldownLeft => Mathf.Max(0f, nextRecall - Time.time);
+    public int MaxDashCharges { get; private set; } = 2;
+    public int DashCharges { get; private set; } = 2;
     public float DashRechargeProgress => DashCharges >= MaxDashCharges ? 1f : Mathf.Clamp01(1f - (rechargeAt - Time.time) / DashRechargeTime);
 
     public SpriteRenderer bodyRenderer;
@@ -35,7 +38,7 @@ public class Player : MonoBehaviour
     Rigidbody2D rb;
     Collider2D col;
     Vector2 dashDir = Vector2.right;
-    float moveX, dashUntil, rechargeAt, hitInvulnUntil, dropUntil;
+    float moveX, dashUntil, rechargeAt, hitInvulnUntil, dropUntil, nextRecall;
     Collider2D dropCollider;
     bool active, jumpRequested, wasDashing, ignoringPlatforms;
     Collider2D[] platforms;
@@ -123,6 +126,12 @@ public class Player : MonoBehaviour
             Weapon.Spawn(this, rb.position + aim * 0.6f, aim);
         }
 
+        if (kb.qKey.wasPressedThisFrame && HasRecall && !HasWeapon && Weapon.Current != null && Time.time >= nextRecall)
+        {
+            Weapon.Current.Recall();
+            nextRecall = Time.time + RecallCooldown;
+        }
+
         UpdateVisuals(aim);
     }
 
@@ -191,6 +200,32 @@ public class Player : MonoBehaviour
     }
 
     public void PickUp() => HasWeapon = true;
+
+    public int Heal(float fractionOfMax)
+    {
+        int amount = Mathf.Max(1, Mathf.RoundToInt(stats.maxHp * fractionOfMax));
+        int before = Hp;
+        Hp = Mathf.Min(stats.maxHp, Hp + amount);
+        return Hp - before;
+    }
+
+    public void GrantRecall() => HasRecall = true;
+
+    public void AddAttack(int amount) => stats.attack += amount;
+
+    public void AddDefense(int amount) => stats.defense += amount;
+
+    public void AddMaxHp(int amount)
+    {
+        stats.maxHp += amount;
+        Hp += amount;
+    }
+
+    public void AddDashCharge()
+    {
+        MaxDashCharges++;
+        DashCharges++;
+    }
 
     public void TakeDamage(int damage)
     {

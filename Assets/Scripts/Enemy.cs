@@ -86,6 +86,13 @@ public class Enemy : MonoBehaviour
         rb.linearVelocity = new Vector2(dir * speed, rb.linearVelocity.y);
     }
 
+    public void ScaleStats(float hpMultiplier, float attackMultiplier)
+    {
+        stats.maxHp = Mathf.Max(1, Mathf.RoundToInt(stats.maxHp * hpMultiplier));
+        stats.attack = Mathf.Max(1, Mathf.RoundToInt(stats.attack * attackMultiplier));
+        hp = stats.maxHp;
+    }
+
     public void TakeHit(int damage)
     {
         hp -= stats.Reduce(damage);

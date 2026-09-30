@@ -2,7 +2,14 @@ using UnityEngine;
 
 public class Weapon : MonoBehaviour
 {
-    enum Phase { Flying, Bouncing, Resting }
+    enum Phase { Flying, Bouncing, Resting, Recalling }
+
+    const float RecallSpeed = 35f;
+
+    public static Weapon Current { get; private set; }
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatics() => Current = null;
 
     const float Speed = 22f;
     const float MaxRange = 9f;
@@ -32,7 +39,32 @@ public class Weapon : MonoBehaviour
         var w = go.GetComponent<Weapon>();
         w.owner = owner;
         w.dir = dir;
+        Current = w;
         return w;
+    }
+
+    void OnDestroy()
+    {
+        if (Current == this) Current = null;
+    }
+
+    public void Recall() => phase = Phase.Recalling;
+
+    void RecallMove()
+    {
+        if (owner == null || owner.Dead) return;
+
+        Vector2 to = (Vector2)owner.transform.position - (Vector2)transform.position;
+        float step = RecallSpeed * Time.deltaTime;
+        if (to.magnitude <= step + PickupDistance)
+        {
+            owner.PickUp();
+            Destroy(gameObject);
+            return;
+        }
+
+        transform.position += (Vector3)(to.normalized * step);
+        transform.Rotate(0f, 0f, 720f * Time.deltaTime);
     }
 
     void Update()
@@ -45,6 +77,9 @@ public class Weapon : MonoBehaviour
             case Phase.Bouncing:
                 Bounce();
                 TryPickup();
+                break;
+            case Phase.Recalling:
+                RecallMove();
                 break;
             default:
                 CheckSupport();

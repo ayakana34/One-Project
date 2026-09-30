@@ -416,6 +416,9 @@ MonoBehaviour:
   bossPrefab: {fileID: 6631348005343077189, guid: 884b93df476f6ac47812f73fb083af09, type: 3}
   flyerPrefab: {fileID: 2807060466700949452, guid: 510ab20f5e534e64daf958d59a925f8a, type: 3}
   shooterPrefab: {fileID: 4420602490896834679, guid: 008feb63399099c48a2f18f0de352141, type: 3}
+  gruntPrefab: {fileID: 5127036400060144911, guid: 7182e04f3461958419dbed4cf69c3b39, type: 3}
+  elitePrefab: {fileID: 5891049835770075296, guid: dad6cd2d00b4d8c43b1dc863a38ef418, type: 3}
+  removePlatformsDuringBoss: 1
 --- !u!4 &577256761
 Transform:
   m_ObjectHideFlags: 0
@@ -1801,6 +1804,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d1e5b8895f296264896da6f1fda05221, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::Player
+  stats:
+    maxHp: 50
+    attack: 10
+    defense: 0
   bodyRenderer: {fileID: 1328572218}
   aimMark: {fileID: 1584580304}
 --- !u!70 &1724777643
