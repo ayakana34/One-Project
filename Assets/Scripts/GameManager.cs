@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
-    public enum GameState { Playing, Reward, Lost }
+    public enum GameState { Title, Playing, Reward, Lost, Paused }
 
     public static GameManager Instance { get; private set; }
 
@@ -15,8 +15,8 @@ public class GameManager : MonoBehaviour
     const int DashChargeCap = 3;
     const float Tier1Top = -3.6f, Tier2Top = -1.2f;
 
-    public float enemyHpGrowth = 0.6f;
-    public float enemyAttackGrowth = 0.25f;
+    public float enemyHpGrowth = 0.3f;
+    public float enemyAttackGrowth = 0.6f;
     public float waveHealFraction = 0.05f;
     public float bossHealFraction = 0.10f;
     public float rareChance = 0.25f;
@@ -59,7 +59,7 @@ public class GameManager : MonoBehaviour
         public int Value => type.values[tier];
     }
 
-    static readonly string[] TierPrefix = { "", "RARE ", "EPIC " };
+    static readonly string[] TierPrefix = { "", "희귀 ", "영웅 " };
     static readonly Color[] TierColor =
     {
         new Color(0.85f, 0.85f, 0.85f),
@@ -73,18 +73,32 @@ public class GameManager : MonoBehaviour
     GUIStyle labelStyle, bigStyle, centerStyle, cardStyle;
     int stage = StageGround, pendingStage, lastHeal;
     float spawnAt = -1f;
+    GameState stateBeforePause;
+    float timeScaleBeforePause = 1f;
+    GUIStyle controlsStyle;
+
+    static bool skipTitleOnLoad;
+    static Font uiFont;
+
+    static Font UiFont => uiFont ??= Font.CreateDynamicFontFromOSFont(
+        new[] { "Malgun Gothic", "맑은 고딕", "NanumGothic", "Noto Sans CJK KR", "Apple SD Gothic Neo" }, 18);
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetStatics() => Instance = null;
+    static void ResetStatics()
+    {
+        Instance = null;
+        skipTitleOnLoad = false;
+        uiFont = null;
+    }
 
     void Awake()
     {
         Instance = this;
-        Time.timeScale = 1f;
+        Time.timeScale = skipTitleOnLoad ? 1f : 0f;
         Physics2D.gravity = new Vector2(0f, -9.81f);
         Player = FindFirstObjectByType<Player>();
         platforms = Array.ConvertAll(FindObjectsByType<PlatformEffector2D>(FindObjectsSortMode.None), p => p.gameObject);
-        State = GameState.Playing;
+        State = skipTitleOnLoad ? GameState.Playing : GameState.Title;
         BuildRewardTypes();
         RandomizePlatforms();
     }
@@ -103,29 +117,29 @@ public class GameManager : MonoBehaviour
     {
         types.Add(new RewardType
         {
-            name = "ATTACK", weight = 3, values = new[] { 5, 10, 20 },
-            describe = v => "Weapon damage +" + v,
+            name = "공격력", weight = 3, values = new[] { 5, 10, 20 },
+            describe = v => "무기 피해 +" + v,
             available = () => true,
             apply = v => Player.AddAttack(v)
         });
         types.Add(new RewardType
         {
-            name = "DEFENSE", weight = 3, values = new[] { 1, 2, 4 },
-            describe = v => "Damage taken -" + v,
+            name = "방어력", weight = 3, values = new[] { 1, 2, 4 },
+            describe = v => "받는 피해 -" + v,
             available = () => true,
             apply = v => Player.AddDefense(v)
         });
         types.Add(new RewardType
         {
-            name = "MAX HP", weight = 3, values = new[] { 10, 20, 40 },
-            describe = v => "Max HP +" + v + ", heal " + v,
+            name = "최대 체력", weight = 3, values = new[] { 10, 20, 40 },
+            describe = v => "최대 체력 +" + v + ", 체력 " + v + " 회복",
             available = () => true,
             apply = v => Player.AddMaxHp(v)
         });
         types.Add(new RewardType
         {
-            name = "DASH", weight = 2, scalesWithTier = false, values = new[] { 1, 1, 1 },
-            describe = v => "Max dash charges +" + v,
+            name = "대쉬 충전", weight = 2, scalesWithTier = false, values = new[] { 1, 1, 1 },
+            describe = v => "대쉬 최대 충전 +" + v,
             available = () => Player.MaxDashCharges < DashChargeCap,
             apply = v => Player.AddDashCharge()
         });
@@ -134,10 +148,24 @@ public class GameManager : MonoBehaviour
     void Update()
     {
         var kb = Keyboard.current;
+        if (State == GameState.Title)
+        {
+            if (kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)) StartGame();
+            return;
+        }
+        if (State == GameState.Paused)
+        {
+            if (kb != null && kb.escapeKey.wasPressedThisFrame) Resume();
+            return;
+        }
+        if (kb != null && kb.escapeKey.wasPressedThisFrame)
+        {
+            Pause();
+            return;
+        }
         if (kb != null && kb.rKey.wasPressedThisFrame)
         {
-            Time.timeScale = 1f;
-            SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+            RestartGame();
             return;
         }
 
@@ -405,12 +433,90 @@ public class GameManager : MonoBehaviour
 
     public void OnPlayerDead() => State = GameState.Lost;
 
+    void StartGame()
+    {
+        State = GameState.Playing;
+        Time.timeScale = 1f;
+    }
+
+    void Pause()
+    {
+        stateBeforePause = State;
+        timeScaleBeforePause = Time.timeScale;
+        State = GameState.Paused;
+        Time.timeScale = 0f;
+    }
+
+    void Resume()
+    {
+        State = stateBeforePause;
+        Time.timeScale = timeScaleBeforePause;
+    }
+
+    void RestartGame()
+    {
+        skipTitleOnLoad = true;
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    void QuitGame()
+    {
+#if UNITY_EDITOR
+        UnityEditor.EditorApplication.isPlaying = false;
+#else
+        Application.Quit();
+#endif
+    }
+
+    void DrawMenu(bool title)
+    {
+        cardStyle ??= new GUIStyle(GUI.skin.button) { font = UiFont, fontSize =20, wordWrap = true, alignment = TextAnchor.MiddleCenter };
+        controlsStyle ??= new GUIStyle(GUI.skin.label) { font = UiFont, fontSize =18, alignment = TextAnchor.UpperLeft, normal = { textColor = Color.white } };
+
+        GUI.color = new Color(0f, 0f, 0f, title ? 0.85f : 0.7f);
+        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+        GUI.color = Color.white;
+        GUI.Label(new Rect(0, Screen.height * 0.08f, Screen.width, 90), title ? "ONE WEAPON" : "일시정지", bigStyle);
+
+        string[] labels = title ? new[] { "시작  (Enter)", "종료" } : new[] { "계속하기  (Esc)", "다시 시작", "종료" };
+        Action[] actions = title ? new Action[] { StartGame, QuitGame } : new Action[] { Resume, RestartGame, QuitGame };
+        const float bw = 280f, bh = 48f, gap = 14f;
+        float x = (Screen.width - bw) * 0.5f;
+        float y = Screen.height * 0.25f;
+        for (int i = 0; i < labels.Length; i++)
+        {
+            if (!GUI.Button(new Rect(x, y + i * (bh + gap), bw, bh), labels[i], cardStyle)) continue;
+
+            actions[i]();
+            return;
+        }
+
+        float cy = y + labels.Length * (bh + gap) + 24f;
+        GUI.Label(new Rect((Screen.width - 520f) * 0.5f, cy, 520f, 260f),
+            "조작 안내\n" +
+            "A / D : 좌우 이동\n" +
+            "Space : 점프   (S + Space : 발판 아래로 내려가기)\n" +
+            "마우스 : 조준\n" +
+            "마우스 좌클릭 : 무기 던지기\n" +
+            "Shift / 마우스 우클릭 : 마우스 방향으로 대쉬\n" +
+            "Q : 무기 회수 (회수 스킬을 얻은 뒤)\n" +
+            "R : 다시 시작      Esc : 메뉴",
+            controlsStyle);
+    }
+
     void OnGUI()
     {
         if (Player == null) return;
-        labelStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 18, normal = { textColor = Color.white } };
-        bigStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 48, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-        centerStyle ??= new GUIStyle(GUI.skin.label) { fontSize = 18, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+        labelStyle ??= new GUIStyle(GUI.skin.label) { font = UiFont, fontSize =18, normal = { textColor = Color.white } };
+        bigStyle ??= new GUIStyle(GUI.skin.label) { font = UiFont, fontSize =48, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+        centerStyle ??= new GUIStyle(GUI.skin.label) { font = UiFont, fontSize =18, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
+
+        if (State == GameState.Title)
+        {
+            DrawMenu(true);
+            return;
+        }
 
         var hpBar = new Rect(16, 16, 300, 26);
         GUI.color = new Color(0.15f, 0.15f, 0.17f);
@@ -420,8 +526,8 @@ public class GameManager : MonoBehaviour
         GUI.color = Color.white;
         GUI.Label(hpBar, Player.Hp + " / " + Player.MaxHp, centerStyle);
 
-        GUI.Label(new Rect(16, 52, 500, 28), "Weapon: " + (Player.HasWeapon ? "READY" : "PICK IT UP"), labelStyle);
-        GUI.Label(new Rect(16, 76, 80, 28), "Dash:", labelStyle);
+        GUI.Label(new Rect(16, 52, 500, 28), "무기: " + (Player.HasWeapon ? "준비됨" : "주워야 함"), labelStyle);
+        GUI.Label(new Rect(16, 76, 80, 28), "대쉬:", labelStyle);
         for (int i = 0; i < Player.MaxDashCharges; i++)
         {
             var slot = new Rect(80 + i * 30, 82, 24, 16);
@@ -432,17 +538,17 @@ public class GameManager : MonoBehaviour
             GUI.DrawTexture(new Rect(slot.x, slot.y, slot.width * fill, slot.height), Texture2D.whiteTexture);
         }
         GUI.color = Color.white;
-        GUI.Label(new Rect(16, 100, 500, 28), "Enemies: " + Enemy.All.Count, labelStyle);
-        GUI.Label(new Rect(16, 124, 500, 28), "Round: " + Round, labelStyle);
-        GUI.Label(new Rect(16, 148, 500, 28), "ATK " + Player.stats.attack + "   DEF " + Player.stats.defense, labelStyle);
+        GUI.Label(new Rect(16, 100, 500, 28), "남은 적: " + Enemy.All.Count, labelStyle);
+        GUI.Label(new Rect(16, 124, 500, 28), "라운드: " + Round, labelStyle);
+        GUI.Label(new Rect(16, 148, 500, 28), "공격력 " + Player.stats.attack + "   방어력 " + Player.stats.defense, labelStyle);
         int nextLine = 172;
         if (Player.HasRecall)
         {
             float left = Player.RecallCooldownLeft;
-            GUI.Label(new Rect(16, nextLine, 500, 28), "Recall [Q]: " + (left <= 0f ? "READY" : left.ToString("0.0") + "s"), labelStyle);
+            GUI.Label(new Rect(16, nextLine, 500, 28), "회수 [Q]: " + (left <= 0f ? "준비됨" : left.ToString("0.0") + "초"), labelStyle);
             nextLine += 24;
         }
-        GUI.Label(new Rect(16, nextLine, 500, 28), "R: Restart", labelStyle);
+        GUI.Label(new Rect(16, nextLine, 500, 28), "R: 다시 시작   Esc: 메뉴", labelStyle);
 
         var boss = Boss.Current;
         if (boss != null)
@@ -454,34 +560,35 @@ public class GameManager : MonoBehaviour
             GUI.color = new Color(0.85f, 0.2f, 0.2f);
             GUI.DrawTexture(new Rect(x, 20, w * Mathf.Clamp01((float)boss.Hp / boss.MaxHp), 22), Texture2D.whiteTexture);
             GUI.color = Color.white;
-            GUI.Label(new Rect(x, 44, w, 28), "BOSS", centerStyle);
+            GUI.Label(new Rect(x, 44, w, 28), "보스", centerStyle);
         }
 
         if (State == GameState.Playing && spawnAt >= 0f)
         {
-            string banner = pendingStage == StageGround ? "ROUND " + (Round + 1) : pendingStage == StageAir ? "WAVE 2" : "BOSS INCOMING";
+            string banner = pendingStage == StageGround ? "라운드 " + (Round + 1) : pendingStage == StageAir ? "웨이브 2" : "보스 등장";
             GUI.Label(new Rect(0, Screen.height * 0.25f, Screen.width, 80), banner, bigStyle);
         }
 
         if (State == GameState.Reward) DrawRewards();
+        if (State == GameState.Paused) DrawMenu(false);
 
         if (State == GameState.Lost)
         {
-            GUI.Label(new Rect(0, 0, Screen.width, Screen.height), "GAME OVER", bigStyle);
-            GUI.Label(new Rect(0, Screen.height * 0.5f + 40, Screen.width, 40), "Reached round " + Round + "   (R to restart)", centerStyle);
+            GUI.Label(new Rect(0, 0, Screen.width, Screen.height), "게임 오버", bigStyle);
+            GUI.Label(new Rect(0, Screen.height * 0.5f + 40, Screen.width, 40), "도달한 라운드: " + Round + "   (R: 다시 시작)", centerStyle);
         }
     }
 
     void DrawRewards()
     {
-        cardStyle ??= new GUIStyle(GUI.skin.button) { fontSize = 20, wordWrap = true, alignment = TextAnchor.MiddleCenter };
+        cardStyle ??= new GUIStyle(GUI.skin.button) { font = UiFont, fontSize =20, wordWrap = true, alignment = TextAnchor.MiddleCenter };
 
         GUI.color = new Color(0f, 0f, 0f, 0.65f);
         GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
-        GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 80), "CHOOSE A REWARD", bigStyle);
+        GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 80), "보상을 선택하세요", bigStyle);
         if (lastHeal > 0)
-            GUI.Label(new Rect(0, Screen.height * 0.18f + 70, Screen.width, 30), "Recovered " + lastHeal + " HP", centerStyle);
+            GUI.Label(new Rect(0, Screen.height * 0.18f + 70, Screen.width, 30), "체력 " + lastHeal + " 회복", centerStyle);
 
         const float w = 260f, h = 170f, gap = 30f;
         float total = choices.Count * w + (choices.Count - 1) * gap;
@@ -492,7 +599,7 @@ public class GameManager : MonoBehaviour
             var card = choices[i];
             var rect = new Rect(x0 + i * (w + gap), y0, w, h);
             string text = card.isRecall
-                ? "[" + (i + 1) + "]\nEPIC RECALL SKILL\nPress Q to pull your weapon back to you"
+                ? "[" + (i + 1) + "]\n영웅 회수 스킬\nQ키로 던진 무기를 불러옵니다"
                 : "[" + (i + 1) + "]\n" + TierPrefix[card.tier] + card.type.name + " +" + card.Value + "\n" + card.type.describe(card.Value);
 
             GUI.backgroundColor = TierColor[card.tier];
