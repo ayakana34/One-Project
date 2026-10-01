@@ -13,6 +13,7 @@ public class GameManager : MonoBehaviour
     const float FloorY = -6f;
     const int StageGround = 0, StageAir = 1, StageBoss = 2;
     const int DashChargeCap = 3;
+    const float Tier1Top = -3.6f, Tier2Top = -1.2f;
 
     public float enemyHpGrowth = 0.6f;
     public float enemyAttackGrowth = 0.25f;
@@ -21,6 +22,11 @@ public class GameManager : MonoBehaviour
     public float rareChance = 0.25f;
     public float epicChance = 0.05f;
     public float recallCardChance = 0.08f;
+
+    public int gruntMin = 3, gruntMax = 5;
+    public int eliteMin = 1, eliteMax = 3;
+    public int flyerMin = 1, flyerMax = 3;
+    public int shooterMin = 1, shooterMax = 3;
 
     public GameObject weaponPrefab;
     public GameObject bossPrefab;
@@ -80,6 +86,17 @@ public class GameManager : MonoBehaviour
         platforms = Array.ConvertAll(FindObjectsByType<PlatformEffector2D>(FindObjectsSortMode.None), p => p.gameObject);
         State = GameState.Playing;
         BuildRewardTypes();
+        RandomizePlatforms();
+    }
+
+    void Start()
+    {
+        var xs = PickFloorXs(Enemy.All.Count);
+        for (int i = 0; i < xs.Count; i++)
+        {
+            var t = Enemy.All[i].transform;
+            t.position = new Vector3(xs[i], t.position.y, t.position.z);
+        }
     }
 
     void BuildRewardTypes()
@@ -221,6 +238,12 @@ public class GameManager : MonoBehaviour
         State = GameState.Playing;
         pendingStage = NextStage();
         spawnAt = Time.time + 1.5f;
+
+        if (pendingStage == StageGround)
+        {
+            foreach (var platform in platforms) platform.SetActive(true);
+        }
+        if (pendingStage != StageBoss || !removePlatformsDuringBoss) RandomizePlatforms();
     }
 
     void SpawnStage(int s)
@@ -228,7 +251,6 @@ public class GameManager : MonoBehaviour
         if (s == StageGround)
         {
             Round++;
-            foreach (var platform in platforms) platform.SetActive(true);
             SpawnGroundWave();
         }
         else if (s == StageAir)
@@ -242,28 +264,132 @@ public class GameManager : MonoBehaviour
         stage = s;
     }
 
-    float SafeX(float x) => Mathf.Abs(x - Player.transform.position.x) < 3f ? -x : x;
-
     void SpawnEnemy(GameObject prefab, Vector3 position)
     {
         var enemy = Instantiate(prefab, position, Quaternion.identity).GetComponent<Enemy>();
         enemy.ScaleStats(1f + enemyHpGrowth * (Round - 1), 1f + enemyAttackGrowth * (Round - 1));
     }
 
+    List<float> PickFloorXs(int count)
+    {
+        var xs = new List<float>();
+        float playerX = Player.transform.position.x;
+        for (int i = 0; i < count; i++)
+        {
+            bool placed = false;
+            for (int t = 0; t < 40 && !placed; t++)
+            {
+                float x = UnityEngine.Random.Range(-9f, 9f);
+                if (Mathf.Abs(x - playerX) < 4f) continue;
+                if (xs.Exists(o => Mathf.Abs(o - x) < 1.4f)) continue;
+                xs.Add(x);
+                placed = true;
+            }
+            if (!placed) xs.Add(playerX < 0f ? 9f : -9f);
+        }
+        return xs;
+    }
+
+    Vector2 PickAirPoint(List<Vector2> used, float minY, float maxY, float minGap)
+    {
+        Vector2 playerPos = Player.transform.position;
+        Vector2 point = Vector2.zero;
+        for (int t = 0; t < 40; t++)
+        {
+            point = new Vector2(UnityEngine.Random.Range(-9f, 9f), UnityEngine.Random.Range(minY, maxY));
+            if (Vector2.Distance(point, playerPos) < 4f) continue;
+            if (used.Exists(o => Vector2.Distance(o, point) < minGap)) continue;
+            break;
+        }
+        used.Add(point);
+        return point;
+    }
+
     void SpawnGroundWave()
     {
-        foreach (float x in new[] { -9f, -7.5f, 7.5f, 9f })
-            SpawnEnemy(gruntPrefab, new Vector3(SafeX(x), FloorY + 0.45f, 0f));
-        foreach (float x in new[] { -5.5f, 5.5f })
-            SpawnEnemy(elitePrefab, new Vector3(SafeX(x), FloorY + 0.65f, 0f));
+        int grunts = UnityEngine.Random.Range(gruntMin, gruntMax + 1);
+        int elites = UnityEngine.Random.Range(eliteMin, eliteMax + 1);
+        var xs = PickFloorXs(grunts + elites);
+        for (int i = 0; i < xs.Count; i++)
+        {
+            if (i < grunts) SpawnEnemy(gruntPrefab, new Vector3(xs[i], FloorY + 0.45f, 0f));
+            else SpawnEnemy(elitePrefab, new Vector3(xs[i], FloorY + 0.65f, 0f));
+        }
     }
 
     void SpawnAirWave()
     {
-        foreach (float x in new[] { -8f, 8f })
-            SpawnEnemy(flyerPrefab, new Vector3(x, 2f, 0f));
-        foreach (float x in new[] { -5f, 5f })
-            SpawnEnemy(shooterPrefab, new Vector3(x, 4.3f, 0f));
+        int flyers = UnityEngine.Random.Range(flyerMin, flyerMax + 1);
+        int shooters = UnityEngine.Random.Range(shooterMin, shooterMax + 1);
+        var used = new List<Vector2>();
+        for (int i = 0; i < flyers; i++)
+        {
+            var p = PickAirPoint(used, 1.5f, 4f, 3f);
+            SpawnEnemy(flyerPrefab, new Vector3(p.x, p.y, 0f));
+        }
+        for (int i = 0; i < shooters; i++)
+        {
+            var p = PickAirPoint(used, 4.3f, 4.3f, 3f);
+            SpawnEnemy(shooterPrefab, new Vector3(p.x, p.y, 0f));
+        }
+    }
+
+    void RandomizePlatforms()
+    {
+        int n = platforms.Length;
+        if (n == 0) return;
+
+        var xs = new float[n];
+        var ws = new float[n];
+        var tiers = new int[n];
+        for (int attempt = 0; attempt < 60; attempt++)
+        {
+            for (int i = 0; i < n; i++)
+            {
+                tiers[i] = i == 0 ? 1 : UnityEngine.Random.Range(1, 3);
+                ws[i] = UnityEngine.Random.Range(3f, 5f);
+                float limit = 10f - ws[i] * 0.5f - 0.5f;
+                xs[i] = UnityEngine.Random.Range(-limit, limit);
+            }
+            if (!LayoutValid(xs, ws, tiers)) continue;
+            ApplyPlatforms(xs, ws, tiers);
+            return;
+        }
+
+        for (int i = 0; i < n; i++)
+        {
+            xs[i] = i == 0 ? -5f : i == 1 ? 5f : 0f;
+            ws[i] = 4f;
+            tiers[i] = i < 2 ? 1 : 2;
+        }
+        ApplyPlatforms(xs, ws, tiers);
+    }
+
+    static bool LayoutValid(float[] xs, float[] ws, int[] tiers)
+    {
+        for (int i = 0; i < xs.Length; i++)
+        {
+            bool reachable = tiers[i] == 1;
+            for (int j = 0; j < xs.Length; j++)
+            {
+                if (i == j) continue;
+                float gap = Mathf.Abs(xs[i] - xs[j]) - (ws[i] + ws[j]) * 0.5f;
+                if (tiers[i] == tiers[j] && gap < 1.5f) return false;
+                if (tiers[i] == 2 && tiers[j] == 1 && gap <= 2f) reachable = true;
+            }
+            if (!reachable) return false;
+        }
+        return true;
+    }
+
+    void ApplyPlatforms(float[] xs, float[] ws, int[] tiers)
+    {
+        for (int i = 0; i < platforms.Length; i++)
+        {
+            float top = tiers[i] == 1 ? Tier1Top : Tier2Top;
+            platforms[i].transform.position = new Vector3(xs[i], top - 0.2f, 0f);
+            platforms[i].transform.localScale = new Vector3(ws[i], 0.4f, 1f);
+        }
     }
 
     void SpawnBoss()
