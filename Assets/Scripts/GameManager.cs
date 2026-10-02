@@ -54,6 +54,7 @@ public class GameManager : MonoBehaviour
     {
         public RewardType type;
         public int tier;
+        public bool isRecall;
         public int Value => type.values[tier];
     }
 
@@ -70,7 +71,6 @@ public class GameManager : MonoBehaviour
     GameObject[] platforms;
     GUIStyle labelStyle, bigStyle, centerStyle, cardStyle;
     int stage = StageGround, pendingStage, lastHeal;
-    bool recallJustGranted;
     float spawnAt = -1f;
     GameState stateBeforePause;
     float timeScaleBeforePause = 1f;
@@ -221,12 +221,12 @@ public class GameManager : MonoBehaviour
     {
         lastHeal = Player.Heal(stage == StageBoss ? bossHealFraction : waveHealFraction);
 
-        recallJustGranted = stage == StageBoss && !Player.HasRecall;
-        if (recallJustGranted) Player.GrantRecall();
+        bool recallReward = stage == StageBoss && !Player.HasRecall;
 
         choices.Clear();
+        if (recallReward) choices.Add(new Card { tier = 2, isRecall = true });
         var candidates = types.FindAll(t => t.available());
-        for (int i = 0; i < 3 && candidates.Count > 0; i++)
+        for (int i = 0; i < 3 && candidates.Count > 0 && !recallReward; i++)
         {
             int total = 0;
             foreach (var t in candidates) total += t.weight;
@@ -257,7 +257,8 @@ public class GameManager : MonoBehaviour
         if (index < 0 || index >= choices.Count) return;
 
         var card = choices[index];
-        card.type.apply(card.Value);
+        if (card.isRecall) Player.GrantRecall();
+        else card.type.apply(card.Value);
         choices.Clear();
 
         Time.timeScale = 1f;
@@ -584,11 +585,9 @@ public class GameManager : MonoBehaviour
         GUI.color = new Color(0f, 0f, 0f, 0.65f);
         GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
-        GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 80), "보상을 선택하세요", bigStyle);
+        GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 80), choices.Count == 1 && choices[0].isRecall ? "보스 처치 보상" : "보상을 선택하세요", bigStyle);
         if (lastHeal > 0)
             GUI.Label(new Rect(0, Screen.height * 0.18f + 70, Screen.width, 30), "체력 " + lastHeal + " 회복", centerStyle);
-        if (recallJustGranted)
-            GUI.Label(new Rect(0, Screen.height * 0.18f + 100, Screen.width, 30), "회수 스킬 획득!  Q키로 던진 무기를 불러오세요", centerStyle);
 
         const float w = 260f, h = 170f, gap = 30f;
         float total = choices.Count * w + (choices.Count - 1) * gap;
@@ -598,7 +597,9 @@ public class GameManager : MonoBehaviour
         {
             var card = choices[i];
             var rect = new Rect(x0 + i * (w + gap), y0, w, h);
-            string text = "[" + (i + 1) + "]\n" + TierPrefix[card.tier] + card.type.name + " +" + card.Value + "\n" + card.type.describe(card.Value);
+            string text = card.isRecall
+                ? "[" + (i + 1) + "]\n회수 스킬\nQ키로 던진 무기를 불러옵니다\n(쿨타임 4초)"
+                : "[" + (i + 1) + "]\n" + TierPrefix[card.tier] + card.type.name + " +" + card.Value + "\n" + card.type.describe(card.Value);
 
             GUI.backgroundColor = TierColor[card.tier];
             if (GUI.Button(rect, text, cardStyle)) ChooseReward(i);
