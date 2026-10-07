@@ -12,10 +12,30 @@ public class Boss : Enemy
 
     public static Boss Current { get; private set; }
 
+    [Header("Sprites (optional)")]
+    public Sprite windupSprite;
+    public Sprite chargeSprite;
+
     Phase phase = Phase.Chase;
     float phaseStart, phaseUntil, chargeDir = 1f;
 
     protected override int ContactDamage => phase == Phase.Charge ? stats.attack * 2 : stats.attack;
+
+    // The charge direction is locked from the wind-up on, so the sprite keeps facing it.
+    protected override bool LockFacing => phase == Phase.Telegraph || phase == Phase.Charge;
+
+    protected override Sprite SpriteForState()
+    {
+        switch (phase)
+        {
+            case Phase.Telegraph:
+                return windupSprite != null ? windupSprite : idleSprite;
+            case Phase.Charge:
+                return chargeSprite != null ? chargeSprite : (windupSprite != null ? windupSprite : idleSprite);
+            default:
+                return idleSprite;
+        }
+    }
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() => Current = null;
@@ -70,6 +90,10 @@ public class Boss : Enemy
         phase = next;
         phaseStart = Time.time;
         phaseUntil = Time.time + duration;
-        if (next == Phase.Telegraph) chargeDir = dx >= 0f ? 1f : -1f;
+        if (next == Phase.Telegraph)
+        {
+            chargeDir = dx >= 0f ? 1f : -1f;
+            facing = chargeDir;
+        }
     }
 }

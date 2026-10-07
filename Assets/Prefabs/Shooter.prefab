@@ -183,6 +183,7 @@ MonoBehaviour:
     maxHp: 20
     attack: 10
     defense: 0
-    power: 0
   speed: 2
+  idleSprite: {fileID: 21300000, guid: 9ca7eef0bb8b36f49a4e6314f24887d6, type: 3}
+  visualScale: 1.1
   bulletPrefab: {fileID: 6252573717780594778, guid: ca2d9e37c0db83f41a59ff28a52bf54f, type: 3}

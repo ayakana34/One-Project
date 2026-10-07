@@ -173,5 +173,6 @@ MonoBehaviour:
     maxHp: 10
     attack: 10
     defense: 0
-    power: 0
   speed: 2.8
+  idleSprite: {fileID: 21300000, guid: 66287ea19e406ac4dbc7ba0faf2d4b09, type: 3}
+  visualScale: 1

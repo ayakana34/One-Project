@@ -183,5 +183,8 @@ MonoBehaviour:
     maxHp: 150
     attack: 10
     defense: 0
-    power: 0
   speed: 1.8
+  idleSprite: {fileID: 21300000, guid: 92e85ec29d3e66d4e9e8bf3a89a16754, type: 3}
+  visualScale: 1
+  windupSprite: {fileID: 21300000, guid: e7425b89c47aa72438cc235ba881e8c8, type: 3}
+  chargeSprite: {fileID: 21300000, guid: fa21a1dce339a144fabc47c89e4c9ba6, type: 3}
