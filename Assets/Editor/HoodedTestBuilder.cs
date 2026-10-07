@@ -17,8 +17,11 @@ public static class HoodedTestBuilder
     const string ScenePath = "Assets/Scenes/CharacterTest.unity";
     const string NoFrictionPath = "Assets/Art/NoFriction.physicsMaterial2D";
     const float CharacterHeight = 1.6f;
+    const float JumpStateSpeed = 0.85f;
+    const float DashStateSpeed = 2.2f;
+    const float ThrowStateSpeed = 2.5f;
 
-    static string AutoKey => "HoodedTestBuilder.Auto.v12." + Application.dataPath;
+    static string AutoKey => "HoodedTestBuilder.Auto.v20." + Application.dataPath;
 
     static HoodedTestBuilder()
     {
@@ -79,12 +82,27 @@ public static class HoodedTestBuilder
         Debug.Log("[Hooded] takes=" + model.importedTakeInfos.Length + ", defaultClips=" + clips.Length + ": " + string.Join(", ", clips.Select(c => c.name)));
         foreach (var c in clips)
         {
-            bool loop = c.name != "Jump";
+            bool loop = c.name == "Idle" || c.name == "Run";
             c.loopTime = loop;
             c.loopPose = loop;
             c.lockRootRotation = true;
             c.lockRootHeightY = true;
             c.lockRootPositionXZ = true;
+            if (c.name == "Throw")
+            {
+                // VARCO throw_baseball (3.3s, arm side view): points forward 1.2-1.6s, cocks the arm behind the head
+                // 1.8-2.1s, releases forward at ~2.2s and follows through until ~3s. Keep cock -> release -> follow-through.
+                c.firstFrame = 54f;
+                c.lastFrame = 84f;
+            }
+            if (c.name == "Jump")
+            {
+                // The VARCO jump clip (seen from the side): stands ~1.4s, crouches 1.7-2.1s, is fully extended at 2.26s,
+                // folds the legs in the air 2.4-2.6s, lands in a crouch at 2.8s and straightens up until 3.3s.
+                // Keep extension -> air -> landing (2.27s-3.0s, ~0.73s = the airtime of a jump).
+                c.firstFrame = 68f;
+                c.lastFrame = 90f;
+            }
         }
         model.clipAnimations = clips;
         model.SaveAndReimport();
@@ -204,24 +222,35 @@ public static class HoodedTestBuilder
         var idle = FindClip("Idle");
         var run = FindClip("Run");
         var jump = FindClip("Jump");
-        if (idle == null || run == null || jump == null)
+        var throwClip = FindClip("Throw");
+        if (idle == null || run == null || jump == null || throwClip == null)
         {
             Debug.Log("[Hooded] assets: " + string.Join(", ", AssetDatabase.LoadAllAssetsAtPath(ModelPath).Where(o => !(o is Transform) && !(o is GameObject)).Select(o => o.GetType().Name + ":" + o.name)));
-            throw new System.Exception("Animation clips not found in the FBX files.");
+            throw new System.Exception("Animation clips not found in the FBX file.");
         }
 
         if (File.Exists(ControllerPath)) AssetDatabase.DeleteAsset(ControllerPath);
         var ctrl = AnimatorController.CreateAnimatorControllerAtPath(ControllerPath);
         ctrl.AddParameter("Run", AnimatorControllerParameterType.Bool);
         ctrl.AddParameter("Grounded", AnimatorControllerParameterType.Bool);
+        ctrl.AddParameter(new AnimatorControllerParameter { name = "RunSpeed", type = AnimatorControllerParameterType.Float, defaultFloat = 1f });
+        ctrl.AddParameter("Dashing", AnimatorControllerParameterType.Bool);
+        ctrl.AddParameter("Throw", AnimatorControllerParameterType.Trigger);
 
+        // Base layer: full body locomotion + roll (dash).
         var sm = ctrl.layers[0].stateMachine;
         var sIdle = sm.AddState("Idle");
         sIdle.motion = idle;
         var sRun = sm.AddState("Run");
         sRun.motion = run;
+        sRun.speedParameterActive = true;
+        sRun.speedParameter = "RunSpeed";
         var sJump = sm.AddState("Jump");
         sJump.motion = jump;
+        sJump.speed = JumpStateSpeed;
+        var sDash = sm.AddState("Dash");
+        sDash.motion = run;
+        sDash.speed = DashStateSpeed;
         sm.defaultState = sIdle;
 
         Link(sIdle, sRun, ("Run", true), ("Grounded", true));
@@ -230,9 +259,68 @@ public static class HoodedTestBuilder
         Link(sRun, sJump, ("Grounded", false));
         Link(sJump, sIdle, ("Grounded", true));
 
+        // Dash: the run cycle at double speed (the body is tilted into the dash direction by the controller).
+        var toDash = sm.AddAnyStateTransition(sDash);
+        toDash.hasExitTime = false;
+        toDash.duration = 0.04f;
+        toDash.canTransitionToSelf = false;
+        toDash.AddCondition(AnimatorConditionMode.If, 0f, "Dashing");
+        var fromDash = sDash.AddTransition(sIdle);
+        fromDash.hasExitTime = false;
+        fromDash.duration = 0.08f;
+        fromDash.AddCondition(AnimatorConditionMode.IfNot, 0f, "Dashing");
+
+        // Upper body layer: the throw plays on the spine/arms only, so the legs keep running.
+        ctrl.AddLayer("UpperBody");
+        var layers = ctrl.layers;
+        layers[1].avatarMask = BuildUpperBodyMask();
+        layers[1].defaultWeight = 1f;
+        layers[1].blendingMode = AnimatorLayerBlendingMode.Override;
+        ctrl.layers = layers;
+        var sm1 = ctrl.layers[1].stateMachine;
+        var sEmpty = sm1.AddState("Empty");
+        var sThrow = sm1.AddState("Throw");
+        sThrow.motion = throwClip;
+        sThrow.speed = ThrowStateSpeed;
+        sm1.defaultState = sEmpty;
+        var toThrow = sEmpty.AddTransition(sThrow);
+        toThrow.hasExitTime = false;
+        toThrow.duration = 0.05f;
+        toThrow.AddCondition(AnimatorConditionMode.If, 0f, "Throw");
+        var fromThrow = sThrow.AddTransition(sEmpty);
+        fromThrow.hasExitTime = true;
+        fromThrow.exitTime = 0.9f;
+        fromThrow.duration = 0.15f;
+
         EditorUtility.SetDirty(ctrl);
         AssetDatabase.SaveAssets();
         return ctrl;
+    }
+
+    static AvatarMask BuildUpperBodyMask()
+    {
+        var paths = new System.Collections.Generic.List<string>();
+        foreach (var tr in AssetDatabase.LoadAllAssetsAtPath(ModelPath).OfType<Transform>())
+        {
+            if (tr.parent == null) continue;
+            string path = tr.name;
+            for (var p = tr.parent; p != null && p.parent != null; p = p.parent) path = p.name + "/" + path;
+            paths.Add(path);
+        }
+        paths.Sort();
+
+        var mask = new AvatarMask { transformCount = paths.Count };
+        for (int i = 0; i < paths.Count; i++)
+        {
+            mask.SetTransformPath(i, paths[i]);
+            mask.SetTransformActive(i, paths[i].Contains("/Spine"));
+        }
+        Debug.Log("[Hooded] upper body mask: " + paths.Count(p => p.Contains("/Spine")) + " of " + paths.Count + " transforms active");
+
+        const string maskPath = Dir + "/Hooded_UpperBody.mask";
+        if (File.Exists(maskPath)) AssetDatabase.DeleteAsset(maskPath);
+        AssetDatabase.CreateAsset(mask, maskPath);
+        return mask;
     }
 
     static void Link(AnimatorState from, AnimatorState to, params (string name, bool value)[] conditions)
@@ -278,7 +366,7 @@ public static class HoodedTestBuilder
         var player = new GameObject("Player");
         player.transform.position = new Vector3(0f, -2.9f, 0f);
         var rb = player.AddComponent<Rigidbody2D>();
-        rb.gravityScale = 4f;
+        rb.gravityScale = 3f;
         rb.freezeRotation = true;
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
         var capsule = player.AddComponent<CapsuleCollider2D>();
@@ -300,29 +388,83 @@ public static class HoodedTestBuilder
         var avatar = FindAvatar(ModelPath);
         if (avatar != null) animator.avatar = avatar;
 
+        var weaponMat = new Material(Shader.Find("Universal Render Pipeline/Lit"));
+        weaponMat.SetColor("_BaseColor", new Color(0.82f, 0.85f, 0.9f));
+        weaponMat.SetFloat("_Metallic", 0.8f);
+        weaponMat.SetFloat("_Smoothness", 0.7f);
+        const string weaponMatPath = Dir + "/Test_Weapon.mat";
+        if (File.Exists(weaponMatPath)) AssetDatabase.DeleteAsset(weaponMatPath);
+        AssetDatabase.CreateAsset(weaponMat, weaponMatPath);
+
         var ctl = player.AddComponent<CharacterTestController>();
         ctl.visual = visual.transform;
         ctl.animator = animator;
+        ctl.weaponMaterial = weaponMat;
+        ctl.weaponInHand = AttachHandWeapon(model, weaponMat);
         player.AddComponent<CharacterAutoShot>();
 
         EditorSceneManager.SaveScene(scene, ScenePath);
         Debug.Log("[Hooded] Test scene built: " + ScenePath);
     }
 
+    // A small stand-in blade held in the right hand while the weapon has not been thrown.
+    static Transform AttachHandWeapon(GameObject model, Material mat)
+    {
+        var hand = model.GetComponentsInChildren<Transform>().FirstOrDefault(tr => tr.name == "RightHand");
+        if (hand == null)
+        {
+            Debug.LogWarning("[Hooded] RightHand bone not found, no hand weapon attached.");
+            return null;
+        }
+        var blade = GameObject.CreatePrimitive(PrimitiveType.Cube);
+        blade.name = "HandWeapon";
+        Object.DestroyImmediate(blade.GetComponent<BoxCollider>());
+        blade.GetComponent<Renderer>().sharedMaterial = mat;
+        blade.transform.SetParent(hand, false);
+        var ls = hand.lossyScale;
+        blade.transform.localRotation = Quaternion.identity;
+        blade.transform.localScale = new Vector3(0.06f / ls.x, 0.45f / ls.y, 0.06f / ls.z);
+        blade.transform.localPosition = new Vector3(0f, 0.2f / ls.y, 0f);
+        Debug.Log("[Hooded] hand weapon attached to " + hand.name + ", hand lossyScale=" + ls);
+        return blade.transform;
+    }
+
     static void FitToHeight(GameObject model, float feetY)
     {
         model.transform.localPosition = Vector3.zero;
         model.transform.localScale = Vector3.one;
-        var b = RenderBounds(model);
+        var b = MeshBounds(model);
         float s = CharacterHeight / Mathf.Max(0.0001f, b.size.y);
         model.transform.localScale = Vector3.one * s;
 
-        b = RenderBounds(model);
+        b = MeshBounds(model);
         var pos = model.transform.position;
         pos.x -= b.center.x - model.transform.parent.position.x;
         pos.y += feetY - b.min.y;
         pos.z -= b.center.z;
         model.transform.position = pos;
+        Debug.Log("[Hooded] fitted model: scale=" + s.ToString("F3") + ", feet at y=" + MeshBounds(model).min.y.ToString("F3") + " (target " + feetY.ToString("F3") + ")");
+    }
+
+    // Bounds of the actually skinned vertices (renderer.bounds is a cached estimate and left the feet floating).
+    static Bounds MeshBounds(GameObject go)
+    {
+        bool first = true;
+        var result = new Bounds();
+        foreach (var smr in go.GetComponentsInChildren<SkinnedMeshRenderer>())
+        {
+            var baked = new Mesh();
+            smr.BakeMesh(baked, true);
+            var toWorld = Matrix4x4.TRS(smr.transform.position, smr.transform.rotation, Vector3.one);
+            foreach (var v in baked.vertices)
+            {
+                var w = toWorld.MultiplyPoint3x4(v);
+                if (first) { result = new Bounds(w, Vector3.zero); first = false; }
+                else result.Encapsulate(w);
+            }
+            Object.DestroyImmediate(baked);
+        }
+        return first ? RenderBounds(go) : result;
     }
 
     static Bounds RenderBounds(GameObject go)
