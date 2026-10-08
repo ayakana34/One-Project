@@ -49,9 +49,7 @@ public class Player : MonoBehaviour
         rb = GetComponent<Rigidbody2D>();
         col = GetComponent<Collider2D>();
         Hp = stats.maxHp;
-        var effectors = FindObjectsByType<PlatformEffector2D>(FindObjectsSortMode.None);
-        platforms = new Collider2D[effectors.Length];
-        for (int i = 0; i < effectors.Length; i++) platforms[i] = effectors[i].GetComponent<Collider2D>();
+        RefreshPlatforms();
         rb.gravityScale = GravityScale;
         rb.freezeRotation = true;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
@@ -200,6 +198,23 @@ public class Player : MonoBehaviour
     }
 
     public void PickUp() => HasWeapon = true;
+
+    // Includes inactive platforms, so the platform pool of the stage maps can be switched on and off.
+    public void RefreshPlatforms()
+    {
+        var effectors = FindObjectsByType<PlatformEffector2D>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        platforms = new Collider2D[effectors.Length];
+        for (int i = 0; i < effectors.Length; i++) platforms[i] = effectors[i].GetComponent<Collider2D>();
+    }
+
+    public void Teleport(Vector2 position)
+    {
+        if (rb == null) rb = GetComponent<Rigidbody2D>(); // can be called from GameManager.Awake, before Player.Awake
+        transform.position = position;
+        rb.position = position;
+        rb.linearVelocity = Vector2.zero;
+        dashUntil = 0f;
+    }
 
     public int Heal(float fractionOfMax)
     {

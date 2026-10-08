@@ -18,6 +18,11 @@ public class Enemy : MonoBehaviour
     protected virtual int ContactDamage => stats.attack;
     protected virtual float GravityScale => 3f;
     protected virtual bool IgnorePlatforms => false;
+    protected virtual float AggroRange => aggroRange;
+
+    // Enemies on the wide stage maps stay idle until the player comes close, then chase for good.
+    public float aggroRange = 12f;
+    bool aggroed;
 
     int hp;
     float flashUntil;
@@ -70,7 +75,8 @@ public class Enemy : MonoBehaviour
         var p = gm.Player;
         bool live = p != null && !p.Dead && gm.State == GameManager.GameState.Playing;
 
-        Move(live ? p : null);
+        if (live && !aggroed && Vector2.Distance(p.transform.position, transform.position) <= AggroRange) aggroed = true;
+        Move(live && aggroed ? p : null);
 
         if (live && Col.Distance(p.Col).isOverlapped) p.TakeDamage(ContactDamage);
     }

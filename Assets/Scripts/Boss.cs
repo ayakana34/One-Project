@@ -17,6 +17,9 @@ public class Boss : Enemy
 
     protected override int ContactDamage => phase == Phase.Charge ? stats.attack * 2 : stats.attack;
 
+    // The boss arena is a single screen, so the boss always goes for the player.
+    protected override float AggroRange => 1000f;
+
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() => Current = null;
 

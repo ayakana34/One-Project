@@ -13,7 +13,6 @@ public class GameManager : MonoBehaviour
     const float FloorY = -6f;
     const int StageGround = 0, StageAir = 1, StageBoss = 2;
     const int DashChargeCap = 3;
-    const float Tier1Top = -3.6f, Tier2Top = -1.2f;
 
     public float enemyHpGrowth = 0.3f;
     public float enemyAttackGrowth = 0.6f;
@@ -34,6 +33,8 @@ public class GameManager : MonoBehaviour
     public GameObject gruntPrefab;
     public GameObject elitePrefab;
     public bool removePlatformsDuringBoss = true;
+    [Tooltip("Open a reward screen every time a stage is left (otherwise only after the boss).")]
+    public bool rewardAfterEveryStage = true;
 
     public Player Player { get; private set; }
     public GameState State { get; private set; }
@@ -72,6 +73,13 @@ public class GameManager : MonoBehaviour
     GUIStyle labelStyle, bigStyle, centerStyle, cardStyle;
     int stage = StageGround, pendingStage, lastHeal;
     float spawnAt = -1f;
+    StageMapDef currentMap = StageMaps.Ground[0];
+    int lastGroundMap = -1, lastAirMap = -1;
+    Transform bgT, ceilingT, floorT, leftT, rightT;
+    GameObject exitGo;
+    CameraFollow camFollow;
+    Sprite squareSprite;
+    readonly List<Transform> stripes = new();
     GameState stateBeforePause;
     float timeScaleBeforePause = 1f;
     GUIStyle controlsStyle;
@@ -99,17 +107,15 @@ public class GameManager : MonoBehaviour
         platforms = Array.ConvertAll(FindObjectsByType<PlatformEffector2D>(FindObjectsSortMode.None), p => p.gameObject);
         State = skipTitleOnLoad ? GameState.Playing : GameState.Title;
         BuildRewardTypes();
-        RandomizePlatforms();
+        SetupWorld();
+        BeginStage(StageGround, true);
     }
 
     void Start()
     {
-        var xs = PickFloorXs(Enemy.All.Count);
-        for (int i = 0; i < xs.Count; i++)
-        {
-            var t = Enemy.All[i].transform;
-            t.position = new Vector3(xs[i], t.position.y, t.position.z);
-        }
+        // The scene still contains the old fixed wave; the first stage is spawned by the stage system instead.
+        foreach (var e in Enemy.All.ToArray()) if (e != null) Destroy(e.gameObject);
+        SpawnStage(StageGround);
     }
 
     void BuildRewardTypes()
@@ -189,7 +195,8 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        if (Enemy.All.Count == 0 && NextStage() >= 0) OpenReward();
+        // Stages 1 and 2 are left through the exit door; the boss stage ends when the boss is dead.
+        if (stage == StageBoss && Enemy.All.Count == 0 && NextStage() >= 0) OpenReward();
     }
 
     bool StageReady(int s) => s switch
@@ -263,32 +270,14 @@ public class GameManager : MonoBehaviour
 
         Time.timeScale = 1f;
         State = GameState.Playing;
-        pendingStage = NextStage();
-        spawnAt = Time.time + 1.5f;
-
-        if (pendingStage == StageGround)
-        {
-            foreach (var platform in platforms) platform.SetActive(true);
-        }
-        if (pendingStage != StageBoss || !removePlatformsDuringBoss) RandomizePlatforms();
+        GoToNextStage();
     }
 
     void SpawnStage(int s)
     {
-        if (s == StageGround)
-        {
-            Round++;
-            SpawnGroundWave();
-        }
-        else if (s == StageAir)
-        {
-            SpawnAirWave();
-        }
-        else
-        {
-            SpawnBoss();
-        }
-        stage = s;
+        if (s == StageGround) SpawnGroundWave();
+        else if (s == StageAir) SpawnAirWave();
+        else SpawnBoss();
     }
 
     void SpawnEnemy(GameObject prefab, Vector3 position)
@@ -306,13 +295,13 @@ public class GameManager : MonoBehaviour
             bool placed = false;
             for (int t = 0; t < 40 && !placed; t++)
             {
-                float x = UnityEngine.Random.Range(-9f, 9f);
+                float x = UnityEngine.Random.Range(currentMap.minX + 6f, currentMap.maxX - 3f);
                 if (Mathf.Abs(x - playerX) < 4f) continue;
                 if (xs.Exists(o => Mathf.Abs(o - x) < 1.4f)) continue;
                 xs.Add(x);
                 placed = true;
             }
-            if (!placed) xs.Add(playerX < 0f ? 9f : -9f);
+            if (!placed) xs.Add(playerX < currentMap.CenterX ? currentMap.maxX - 3f : currentMap.minX + 6f);
         }
         return xs;
     }
@@ -323,7 +312,7 @@ public class GameManager : MonoBehaviour
         Vector2 point = Vector2.zero;
         for (int t = 0; t < 40; t++)
         {
-            point = new Vector2(UnityEngine.Random.Range(-9f, 9f), UnityEngine.Random.Range(minY, maxY));
+            point = new Vector2(UnityEngine.Random.Range(currentMap.minX + 8f, currentMap.maxX - 2f), UnityEngine.Random.Range(minY, maxY));
             if (Vector2.Distance(point, playerPos) < 4f) continue;
             if (used.Exists(o => Vector2.Distance(o, point) < minGap)) continue;
             break;
@@ -334,8 +323,8 @@ public class GameManager : MonoBehaviour
 
     void SpawnGroundWave()
     {
-        int grunts = UnityEngine.Random.Range(gruntMin, gruntMax + 1);
-        int elites = UnityEngine.Random.Range(eliteMin, eliteMax + 1);
+        int grunts = ScaledCount(gruntMin, gruntMax);
+        int elites = ScaledCount(eliteMin, eliteMax);
         var xs = PickFloorXs(grunts + elites);
         for (int i = 0; i < xs.Count; i++)
         {
@@ -346,8 +335,8 @@ public class GameManager : MonoBehaviour
 
     void SpawnAirWave()
     {
-        int flyers = UnityEngine.Random.Range(flyerMin, flyerMax + 1);
-        int shooters = UnityEngine.Random.Range(shooterMin, shooterMax + 1);
+        int flyers = ScaledCount(flyerMin, flyerMax);
+        int shooters = ScaledCount(shooterMin, shooterMax);
         var used = new List<Vector2>();
         for (int i = 0; i < flyers; i++)
         {
@@ -361,73 +350,188 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void RandomizePlatforms()
+    // Wide maps get more monsters than the single-screen arena they were tuned for.
+    int ScaledCount(int min, int max)
     {
-        int n = platforms.Length;
-        if (n == 0) return;
-
-        var xs = new float[n];
-        var ws = new float[n];
-        var tiers = new int[n];
-        for (int attempt = 0; attempt < 60; attempt++)
-        {
-            for (int i = 0; i < n; i++)
-            {
-                tiers[i] = i == 0 ? 1 : UnityEngine.Random.Range(1, 3);
-                ws[i] = UnityEngine.Random.Range(3f, 5f);
-                float limit = 10f - ws[i] * 0.5f - 0.5f;
-                xs[i] = UnityEngine.Random.Range(-limit, limit);
-            }
-            if (!LayoutValid(xs, ws, tiers)) continue;
-            ApplyPlatforms(xs, ws, tiers);
-            return;
-        }
-
-        for (int i = 0; i < n; i++)
-        {
-            xs[i] = i == 0 ? -5f : i == 1 ? 5f : 0f;
-            ws[i] = 4f;
-            tiers[i] = i < 2 ? 1 : 2;
-        }
-        ApplyPlatforms(xs, ws, tiers);
-    }
-
-    static bool LayoutValid(float[] xs, float[] ws, int[] tiers)
-    {
-        for (int i = 0; i < xs.Length; i++)
-        {
-            bool reachable = tiers[i] == 1;
-            for (int j = 0; j < xs.Length; j++)
-            {
-                if (i == j) continue;
-                float gap = Mathf.Abs(xs[i] - xs[j]) - (ws[i] + ws[j]) * 0.5f;
-                if (tiers[i] == tiers[j] && gap < 1.5f) return false;
-                if (tiers[i] == 2 && tiers[j] == 1 && gap <= 2f) reachable = true;
-            }
-            if (!reachable) return false;
-        }
-        return true;
-    }
-
-    void ApplyPlatforms(float[] xs, float[] ws, int[] tiers)
-    {
-        for (int i = 0; i < platforms.Length; i++)
-        {
-            float top = tiers[i] == 1 ? Tier1Top : Tier2Top;
-            platforms[i].transform.position = new Vector3(xs[i], top - 0.2f, 0f);
-            platforms[i].transform.localScale = new Vector3(ws[i], 0.4f, 1f);
-        }
+        float scale = Mathf.Max(1f, currentMap.Width / 20f * 0.75f);
+        return Mathf.Max(1, Mathf.RoundToInt(UnityEngine.Random.Range(min, max + 1) * scale));
     }
 
     void SpawnBoss()
     {
-        if (removePlatformsDuringBoss)
+        float x = Player.transform.position.x < currentMap.CenterX ? 7f : -7f;
+        SpawnEnemy(bossPrefab, new Vector3(currentMap.CenterX + x, FloorY + 1.15f, 0f));
+    }
+
+    // ---- stage maps ----
+
+    void SetupWorld()
+    {
+        // Platform pool: the scene's platforms plus clones, each stage map switches the ones it needs on.
+        var list = new List<GameObject>(platforms);
+        if (list.Count > 0)
         {
-            foreach (var platform in platforms) platform.SetActive(false);
+            squareSprite = list[0].GetComponent<SpriteRenderer>().sprite;
+            while (list.Count < StageMaps.MaxPlatforms)
+            {
+                var clone = Instantiate(list[0], list[0].transform.parent);
+                clone.name = "Platform" + list.Count;
+                list.Add(clone);
+            }
+        }
+        platforms = list.ToArray();
+        Player.RefreshPlatforms();
+
+        var level = GameObject.Find("Level");
+        if (level != null)
+        {
+            bgT = level.transform.Find("Background");
+            ceilingT = level.transform.Find("Ceiling");
+            floorT = level.transform.Find("Floor");
+            leftT = level.transform.Find("LeftWall");
+            rightT = level.transform.Find("RightWall");
         }
 
-        float x = Player.transform.position.x < 0f ? 7f : -7f;
-        SpawnEnemy(bossPrefab, new Vector3(x, FloorY + 1.15f, 0f));
+        exitGo = new GameObject("Exit");
+        exitGo.transform.localScale = new Vector3(1.4f, 2.4f, 1f);
+        var exitRenderer = exitGo.AddComponent<SpriteRenderer>();
+        exitRenderer.sprite = squareSprite;
+        exitRenderer.color = new Color(1f, 0.82f, 0.3f);
+        exitRenderer.sortingOrder = -4;
+        var exitBox = exitGo.AddComponent<BoxCollider2D>();
+        exitBox.size = Vector2.one;
+        exitBox.isTrigger = true;
+        exitGo.AddComponent<StageExit>();
+
+        var cam = Camera.main;
+        if (cam != null)
+        {
+            camFollow = cam.GetComponent<CameraFollow>();
+            if (camFollow == null) camFollow = cam.gameObject.AddComponent<CameraFollow>();
+            camFollow.target = Player.transform;
+        }
+    }
+
+    static StageMapDef PickMap(StageMapDef[] maps, ref int last)
+    {
+        int i = UnityEngine.Random.Range(0, maps.Length);
+        if (maps.Length > 1 && i == last) i = (i + 1) % maps.Length;
+        last = i;
+        return maps[i];
+    }
+
+    // Loads the map of a stage (geometry, platforms, exit, camera) and puts the player at its start.
+    void BeginStage(int s, bool first)
+    {
+        stage = s;
+        pendingStage = s;
+        if (s == StageGround && !first) Round++;
+
+        StageMapDef map;
+        if (s == StageGround) map = PickMap(StageMaps.Ground, ref lastGroundMap);
+        else if (s == StageAir) map = PickMap(StageMaps.Air, ref lastAirMap);
+        else map = removePlatformsDuringBoss ? StageMaps.Arena : StageMaps.ArenaWithPlatforms;
+
+        ClearField();
+        ApplyMap(map, s != StageBoss);
+        Player.Teleport(new Vector2(map.playerStartX, FloorY + 0.55f));
+        if (camFollow != null) camFollow.SetBounds(map.minX, map.maxX, true);
+    }
+
+    void GoToNextStage()
+    {
+        int next = NextStage();
+        if (next < 0) return;
+        BeginStage(next, false);
+        spawnAt = Time.time + 1.5f;
+    }
+
+    void ClearField()
+    {
+        foreach (var e in Enemy.All.ToArray()) if (e != null) Destroy(e.gameObject);
+        foreach (var b in FindObjectsByType<EnemyBullet>(FindObjectsSortMode.None)) Destroy(b.gameObject);
+        if (Weapon.Current != null) Destroy(Weapon.Current.gameObject);
+        Player.PickUp();
+    }
+
+    void ApplyMap(StageMapDef map, bool withExit)
+    {
+        currentMap = map;
+        float w = map.Width, cx = map.CenterX;
+        Place(bgT, new Vector3(cx, 0f, 0f), new Vector3(w, 12f, 1f));
+        Place(ceilingT, new Vector3(cx, 6.5f, 0f), new Vector3(w + 2f, 1f, 1f));
+        Place(floorT, new Vector3(cx, -6.5f, 0f), new Vector3(w + 2f, 1f, 1f));
+        Place(leftT, new Vector3(map.minX - 0.5f, 0f, 0f), new Vector3(1f, 12f, 1f));
+        Place(rightT, new Vector3(map.maxX + 0.5f, 0f, 0f), new Vector3(1f, 12f, 1f));
+
+        for (int i = 0; i < platforms.Length; i++)
+        {
+            bool used = i < map.platforms.Length;
+            platforms[i].SetActive(used);
+            if (!used) continue;
+            var d = map.platforms[i];
+            platforms[i].transform.position = new Vector3(d.x, d.y - 0.2f, 0f);
+            platforms[i].transform.localScale = new Vector3(d.z, 0.4f, 1f);
+        }
+
+        exitGo.SetActive(withExit);
+        exitGo.transform.position = new Vector3(map.maxX - 1.5f, FloorY + 1.2f, 0f);
+
+        // Faint vertical stripes in the background so that moving along a wide map can be seen.
+        int needed = Mathf.CeilToInt(w / 5f) + 1;
+        while (stripes.Count < needed)
+        {
+            var go = new GameObject("BgStripe");
+            var sr = go.AddComponent<SpriteRenderer>();
+            sr.sprite = squareSprite;
+            sr.color = new Color(0.22f, 0.22f, 0.26f);
+            sr.sortingOrder = -9;
+            go.transform.localScale = new Vector3(0.35f, 12f, 1f);
+            stripes.Add(go.transform);
+        }
+        for (int i = 0; i < stripes.Count; i++)
+        {
+            bool on = i < needed;
+            stripes[i].gameObject.SetActive(on);
+            if (on) stripes[i].position = new Vector3(map.minX + 2.5f + i * 5f, 0f, 0f);
+        }
+    }
+
+    static void Place(Transform t, Vector3 position, Vector3 scale)
+    {
+        if (t == null) return;
+        t.position = position;
+        t.localScale = scale;
+    }
+
+    public void OnExitReached()
+    {
+        if (State != GameState.Playing || spawnAt >= 0f || stage == StageBoss) return;
+        if (rewardAfterEveryStage)
+        {
+            OpenReward();
+        }
+        else
+        {
+            lastHeal = Player.Heal(waveHealFraction);
+            GoToNextStage();
+        }
+    }
+
+    void DrawExitHint()
+    {
+        var cam = Camera.main;
+        if (cam == null || exitGo == null || !exitGo.activeSelf) return;
+        var screen = cam.WorldToScreenPoint(exitGo.transform.position + Vector3.up * 1.7f);
+        if (screen.x >= 0f && screen.x <= Screen.width)
+        {
+            GUI.Label(new Rect(screen.x - 50f, Screen.height - screen.y - 14f, 100f, 28f), "출구", centerStyle);
+        }
+        else
+        {
+            int meters = Mathf.Max(0, Mathf.RoundToInt(exitGo.transform.position.x - Player.transform.position.x));
+            GUI.Label(new Rect(Screen.width - 200f, Screen.height * 0.4f, 190f, 28f), "출구 >> " + meters + "m", labelStyle);
+        }
     }
 
     public void OnPlayerDead() => State = GameState.Lost;
@@ -538,7 +642,7 @@ public class GameManager : MonoBehaviour
         }
         GUI.color = Color.white;
         GUI.Label(new Rect(16, 100, 500, 28), "남은 적: " + Enemy.All.Count, labelStyle);
-        GUI.Label(new Rect(16, 124, 500, 28), "라운드: " + Round, labelStyle);
+        GUI.Label(new Rect(16, 124, 500, 28), "스테이지 " + (stage + 1) + "/3   라운드 " + Round, labelStyle);
         GUI.Label(new Rect(16, 148, 500, 28), "공격력 " + Player.stats.attack + "   방어력 " + Player.stats.defense, labelStyle);
         int nextLine = 172;
         if (Player.HasRecall)
@@ -564,10 +668,11 @@ public class GameManager : MonoBehaviour
 
         if (State == GameState.Playing && spawnAt >= 0f)
         {
-            string banner = pendingStage == StageGround ? "라운드 " + (Round + 1) : pendingStage == StageAir ? "웨이브 2" : "보스 등장";
+            string banner = pendingStage == StageGround ? "스테이지 1 · 라운드 " + Round : pendingStage == StageAir ? "스테이지 2" : "스테이지 3 · 보스";
             GUI.Label(new Rect(0, Screen.height * 0.25f, Screen.width, 80), banner, bigStyle);
         }
 
+        if (State == GameState.Playing) DrawExitHint();
         if (State == GameState.Reward) DrawRewards();
         if (State == GameState.Paused) DrawMenu(false);
 
