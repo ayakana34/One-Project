@@ -26,6 +26,12 @@ public class StageAutoShot : MonoBehaviour
         return m.Invoke(gm, args);
     }
 
+    static IEnumerator WaitFor(System.Func<bool> condition, float timeout)
+    {
+        float until = Time.realtimeSinceStartup + timeout;
+        while (!condition() && Time.realtimeSinceStartup < until) yield return null;
+    }
+
     static int Field(string name)
     {
         var f = typeof(GameManager).GetField(name, All);
@@ -92,7 +98,8 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.4f);
         Report("stage 2 loaded");
         Shot("2_banner");
-        yield return new WaitForSecondsRealtime(1.5f);
+        yield return WaitFor(() => Enemy.All.Count > 0, 10f);
+        yield return new WaitForSecondsRealtime(0.3f);
         Report("stage 2 enemies");
         Shot("2_start");
         GoTo(2f);
@@ -101,17 +108,20 @@ public class StageAutoShot : MonoBehaviour
         yield return LeaveByExit("reward_after_2");
 
         // Boss stage
-        yield return new WaitForSecondsRealtime(2.2f);
+        yield return WaitFor(() => FindObjectsByType<Boss>(FindObjectsSortMode.None).Length > 0, 10f);
+        yield return new WaitForSecondsRealtime(0.5f);
         Report("boss stage");
         Shot("3_boss");
         foreach (var boss in FindObjectsByType<Boss>(FindObjectsSortMode.None)) boss.TakeHit(100000);
-        yield return new WaitForSecondsRealtime(0.5f);
+        yield return WaitFor(() => gm.State == GameManager.GameState.Reward, 10f);
+        yield return new WaitForSecondsRealtime(0.3f);
         Report("boss dead");
         Shot("reward_after_boss");
         Invoke("ChooseReward", 0);
 
         // Back to stage 1 as round 2
-        yield return new WaitForSecondsRealtime(2.2f);
+        yield return WaitFor(() => Field("stage") == 0 && Enemy.All.Count > 0, 10f);
+        yield return new WaitForSecondsRealtime(0.3f);
         Report("round 2");
         Shot("1_round2");
 
