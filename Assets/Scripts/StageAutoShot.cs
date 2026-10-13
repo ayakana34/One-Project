@@ -64,7 +64,7 @@ public class StageAutoShot : MonoBehaviour
             int active = FindObjectsByType<PlatformEffector2D>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length;
             var exit = GameObject.Find("Exit");
             Debug.Log("[Stages] " + label + ": stage=" + Field("stage") + " round=" + gm.Round + " state=" + gm.State
-                + " enemies=" + Enemy.All.Count + " platforms=" + active + " player=" + gm.Player.transform.position.ToString("F1")
+                + " hp=" + gm.Player.Hp + "/" + gm.Player.MaxHp + " enemies=" + Enemy.All.Count + " platforms=" + active + " player=" + gm.Player.transform.position.ToString("F1")
                 + " cam.x=" + cam.transform.position.x.ToString("F1") + " exit=" + (exit != null && exit.activeSelf ? exit.transform.position.x.ToString("F1") : "off")
                 + " types=" + string.Join(",", Enemy.All.Select(e => e.name.Replace("(Clone)", "")).GroupBy(n => n).Select(g => g.Key + "x" + g.Count())));
         }
@@ -88,6 +88,8 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(1.0f);
         Report("stage 1 start");
         Shot("1_start");
+        gm.Player.TakeDamage(30); // to see whether the rewards heal
+        Report("after 30 damage");
         GoTo(0f);
         yield return new WaitForSecondsRealtime(1.2f);
         Report("stage 1 middle");

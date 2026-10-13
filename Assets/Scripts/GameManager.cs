@@ -16,7 +16,6 @@ public class GameManager : MonoBehaviour
 
     public float enemyHpGrowth = 0.3f;
     public float enemyAttackGrowth = 0.6f;
-    public float waveHealFraction = 0.05f;
     public float bossHealFraction = 0.10f;
     public float rareChance = 0.25f;
     public float epicChance = 0.05f;
@@ -229,7 +228,8 @@ public class GameManager : MonoBehaviour
 
     void OpenReward()
     {
-        lastHeal = Player.Heal(stage == StageBoss ? bossHealFraction : waveHealFraction);
+        // Health is only restored when the boss reward opens; leaving stages 1 and 2 heals nothing.
+        lastHeal = stage == StageBoss ? Player.Heal(bossHealFraction) : 0;
 
         bool recallReward = stage == StageBoss && !Player.HasRecall;
 
@@ -525,7 +525,7 @@ public class GameManager : MonoBehaviour
         }
         else
         {
-            lastHeal = Player.Heal(waveHealFraction);
+            lastHeal = 0;
             GoToNextStage();
         }
     }
