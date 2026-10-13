@@ -26,6 +26,10 @@ public class GameManager : MonoBehaviour
     public int flyerMin = 1, flyerMax = 3;
     public int shooterMin = 1, shooterMax = 3;
 
+    [Tooltip("Stages 1 and 2 both spawn ground and air monsters; this scales how many of each type (1 = the full count).")]
+    public float stage1Mix = 0.6f;
+    public float stage2Mix = 0.75f;
+
     public GameObject weaponPrefab;
     public GameObject bossPrefab;
     public GameObject flyerPrefab;
@@ -201,8 +205,7 @@ public class GameManager : MonoBehaviour
 
     bool StageReady(int s) => s switch
     {
-        StageGround => gruntPrefab != null && elitePrefab != null,
-        StageAir => flyerPrefab != null && shooterPrefab != null,
+        StageGround or StageAir => gruntPrefab != null && elitePrefab != null && flyerPrefab != null && shooterPrefab != null,
         _ => bossPrefab != null
     };
 
@@ -275,9 +278,15 @@ public class GameManager : MonoBehaviour
 
     void SpawnStage(int s)
     {
-        if (s == StageGround) SpawnGroundWave();
-        else if (s == StageAir) SpawnAirWave();
-        else SpawnBoss();
+        if (s == StageBoss)
+        {
+            SpawnBoss();
+            return;
+        }
+
+        float mix = s == StageGround ? stage1Mix : stage2Mix;
+        SpawnGroundWave(mix);
+        SpawnAirWave(mix);
     }
 
     void SpawnEnemy(GameObject prefab, Vector3 position)
@@ -321,10 +330,10 @@ public class GameManager : MonoBehaviour
         return point;
     }
 
-    void SpawnGroundWave()
+    void SpawnGroundWave(float mix)
     {
-        int grunts = ScaledCount(gruntMin, gruntMax);
-        int elites = ScaledCount(eliteMin, eliteMax);
+        int grunts = Mixed(ScaledCount(gruntMin, gruntMax), mix);
+        int elites = Mixed(ScaledCount(eliteMin, eliteMax), mix);
         var xs = PickFloorXs(grunts + elites);
         for (int i = 0; i < xs.Count; i++)
         {
@@ -333,10 +342,10 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    void SpawnAirWave()
+    void SpawnAirWave(float mix)
     {
-        int flyers = ScaledCount(flyerMin, flyerMax);
-        int shooters = ScaledCount(shooterMin, shooterMax);
+        int flyers = Mixed(ScaledCount(flyerMin, flyerMax), mix);
+        int shooters = Mixed(ScaledCount(shooterMin, shooterMax), mix);
         var used = new List<Vector2>();
         for (int i = 0; i < flyers; i++)
         {
@@ -356,6 +365,9 @@ public class GameManager : MonoBehaviour
         float scale = Mathf.Max(1f, currentMap.Width / 20f * 0.75f);
         return Mathf.Max(1, Mathf.RoundToInt(UnityEngine.Random.Range(min, max + 1) * scale));
     }
+
+    // Every monster type shows up at least once in a regular stage.
+    static int Mixed(int count, float mix) => Mathf.Max(1, Mathf.RoundToInt(count * mix));
 
     void SpawnBoss()
     {
