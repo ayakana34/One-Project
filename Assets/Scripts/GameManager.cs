@@ -20,15 +20,6 @@ public class GameManager : MonoBehaviour
     public float rareChance = 0.25f;
     public float epicChance = 0.05f;
 
-    public int gruntMin = 3, gruntMax = 5;
-    public int eliteMin = 1, eliteMax = 3;
-    public int flyerMin = 1, flyerMax = 3;
-    public int shooterMin = 1, shooterMax = 3;
-
-    [Tooltip("Stages 1 and 2 both spawn ground and air monsters; this scales how many of each type (1 = the full count).")]
-    public float stage1Mix = 0.6f;
-    public float stage2Mix = 0.75f;
-
     public GameObject weaponPrefab;
     public GameObject bossPrefab;
     public GameObject flyerPrefab;
@@ -76,10 +67,10 @@ public class GameManager : MonoBehaviour
     GUIStyle labelStyle, bigStyle, centerStyle, cardStyle;
     int stage = StageGround, pendingStage, lastHeal;
     float spawnAt = -1f;
-    StageMapDef currentMap = StageMaps.Ground[0];
-    int lastGroundMap = -1, lastAirMap = -1;
+    StageMapDef currentMap = StageMaps.Stage1[0];
     Transform bgT, ceilingT, floorT, leftT, rightT;
     GameObject exitGo;
+    SpriteRenderer exitRenderer;
     CameraFollow camFollow;
     Sprite squareSprite;
     readonly List<Transform> stripes = new();
@@ -188,6 +179,8 @@ public class GameManager : MonoBehaviour
 
         if (State != GameState.Playing) return;
 
+        UpdateExitDoor();
+
         if (spawnAt >= 0f)
         {
             if (Time.time >= spawnAt)
@@ -284,90 +277,23 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        float mix = s == StageGround ? stage1Mix : stage2Mix;
-        SpawnGroundWave(mix);
-        SpawnAirWave(mix);
+        // Every map has its own fixed set of monsters.
+        foreach (var e in currentMap.enemies) SpawnEnemy(PrefabFor(e.kind), new Vector3(e.x, e.y, 0f));
     }
+
+    GameObject PrefabFor(EnemyKind kind) => kind switch
+    {
+        EnemyKind.Grunt => gruntPrefab,
+        EnemyKind.Elite => elitePrefab,
+        EnemyKind.Flyer => flyerPrefab,
+        _ => shooterPrefab
+    };
 
     void SpawnEnemy(GameObject prefab, Vector3 position)
     {
         var enemy = Instantiate(prefab, position, Quaternion.identity).GetComponent<Enemy>();
         enemy.ScaleStats(1f + enemyHpGrowth * (Round - 1), 1f + enemyAttackGrowth * (Round - 1));
     }
-
-    List<float> PickFloorXs(int count)
-    {
-        var xs = new List<float>();
-        float playerX = Player.transform.position.x;
-        for (int i = 0; i < count; i++)
-        {
-            bool placed = false;
-            for (int t = 0; t < 40 && !placed; t++)
-            {
-                float x = UnityEngine.Random.Range(currentMap.minX + 6f, currentMap.maxX - 3f);
-                if (Mathf.Abs(x - playerX) < 4f) continue;
-                if (xs.Exists(o => Mathf.Abs(o - x) < 1.4f)) continue;
-                xs.Add(x);
-                placed = true;
-            }
-            if (!placed) xs.Add(playerX < currentMap.CenterX ? currentMap.maxX - 3f : currentMap.minX + 6f);
-        }
-        return xs;
-    }
-
-    Vector2 PickAirPoint(List<Vector2> used, float minY, float maxY, float minGap)
-    {
-        Vector2 playerPos = Player.transform.position;
-        Vector2 point = Vector2.zero;
-        for (int t = 0; t < 40; t++)
-        {
-            point = new Vector2(UnityEngine.Random.Range(currentMap.minX + 8f, currentMap.maxX - 2f), UnityEngine.Random.Range(minY, maxY));
-            if (Vector2.Distance(point, playerPos) < 4f) continue;
-            if (used.Exists(o => Vector2.Distance(o, point) < minGap)) continue;
-            break;
-        }
-        used.Add(point);
-        return point;
-    }
-
-    void SpawnGroundWave(float mix)
-    {
-        int grunts = Mixed(ScaledCount(gruntMin, gruntMax), mix);
-        int elites = Mixed(ScaledCount(eliteMin, eliteMax), mix);
-        var xs = PickFloorXs(grunts + elites);
-        for (int i = 0; i < xs.Count; i++)
-        {
-            if (i < grunts) SpawnEnemy(gruntPrefab, new Vector3(xs[i], FloorY + 0.45f, 0f));
-            else SpawnEnemy(elitePrefab, new Vector3(xs[i], FloorY + 0.65f, 0f));
-        }
-    }
-
-    void SpawnAirWave(float mix)
-    {
-        int flyers = Mixed(ScaledCount(flyerMin, flyerMax), mix);
-        int shooters = Mixed(ScaledCount(shooterMin, shooterMax), mix);
-        var used = new List<Vector2>();
-        for (int i = 0; i < flyers; i++)
-        {
-            var p = PickAirPoint(used, 1.5f, 4f, 3f);
-            SpawnEnemy(flyerPrefab, new Vector3(p.x, p.y, 0f));
-        }
-        for (int i = 0; i < shooters; i++)
-        {
-            var p = PickAirPoint(used, 4.3f, 4.3f, 3f);
-            SpawnEnemy(shooterPrefab, new Vector3(p.x, p.y, 0f));
-        }
-    }
-
-    // Wide maps get more monsters than the single-screen arena they were tuned for.
-    int ScaledCount(int min, int max)
-    {
-        float scale = Mathf.Max(1f, currentMap.Width / 20f * 0.75f);
-        return Mathf.Max(1, Mathf.RoundToInt(UnityEngine.Random.Range(min, max + 1) * scale));
-    }
-
-    // Every monster type shows up at least once in a regular stage.
-    static int Mixed(int count, float mix) => Mathf.Max(1, Mathf.RoundToInt(count * mix));
 
     void SpawnBoss()
     {
@@ -406,7 +332,7 @@ public class GameManager : MonoBehaviour
 
         exitGo = new GameObject("Exit");
         exitGo.transform.localScale = new Vector3(1.4f, 2.4f, 1f);
-        var exitRenderer = exitGo.AddComponent<SpriteRenderer>();
+        exitRenderer = exitGo.AddComponent<SpriteRenderer>();
         exitRenderer.sprite = squareSprite;
         exitRenderer.color = new Color(1f, 0.82f, 0.3f);
         exitRenderer.sortingOrder = -4;
@@ -424,13 +350,8 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    static StageMapDef PickMap(StageMapDef[] maps, ref int last)
-    {
-        int i = UnityEngine.Random.Range(0, maps.Length);
-        if (maps.Length > 1 && i == last) i = (i + 1) % maps.Length;
-        last = i;
-        return maps[i];
-    }
+    // The two layouts of a stage alternate with the round (round 1: A, round 2: B, ...), so every tester sees the same.
+    StageMapDef PickMap(StageMapDef[] maps) => maps[(Round - 1) % maps.Length];
 
     // Loads the map of a stage (geometry, platforms, exit, camera) and puts the player at its start.
     void BeginStage(int s, bool first)
@@ -440,8 +361,8 @@ public class GameManager : MonoBehaviour
         if (s == StageGround && !first) Round++;
 
         StageMapDef map;
-        if (s == StageGround) map = PickMap(StageMaps.Ground, ref lastGroundMap);
-        else if (s == StageAir) map = PickMap(StageMaps.Air, ref lastAirMap);
+        if (s == StageGround) map = PickMap(StageMaps.Stage1);
+        else if (s == StageAir) map = PickMap(StageMaps.Stage2);
         else map = removePlatformsDuringBoss ? StageMaps.Arena : StageMaps.ArenaWithPlatforms;
 
         ClearField();
@@ -516,9 +437,18 @@ public class GameManager : MonoBehaviour
         t.localScale = scale;
     }
 
+    // Stages 1 and 2 are left through the exit, which opens once every monster of the stage is dead.
+    bool ExitOpen => stage != StageBoss && spawnAt < 0f && Enemy.All.Count == 0;
+
+    void UpdateExitDoor()
+    {
+        if (exitRenderer == null || !exitGo.activeSelf) return;
+        exitRenderer.color = ExitOpen ? new Color(1f, 0.82f, 0.3f) : new Color(0.42f, 0.27f, 0.27f);
+    }
+
     public void OnExitReached()
     {
-        if (State != GameState.Playing || spawnAt >= 0f || stage == StageBoss) return;
+        if (State != GameState.Playing || !ExitOpen) return;
         if (rewardAfterEveryStage)
         {
             OpenReward();
@@ -534,15 +464,18 @@ public class GameManager : MonoBehaviour
     {
         var cam = Camera.main;
         if (cam == null || exitGo == null || !exitGo.activeSelf) return;
+        bool open = ExitOpen;
         var screen = cam.WorldToScreenPoint(exitGo.transform.position + Vector3.up * 1.7f);
         if (screen.x >= 0f && screen.x <= Screen.width)
         {
-            GUI.Label(new Rect(screen.x - 50f, Screen.height - screen.y - 14f, 100f, 28f), "출구", centerStyle);
+            string label = open ? "출구" : "잠김 · 남은 적 " + Enemy.All.Count;
+            GUI.Label(new Rect(screen.x - 100f, Screen.height - screen.y - 14f, 200f, 28f), label, centerStyle);
         }
         else
         {
             int meters = Mathf.Max(0, Mathf.RoundToInt(exitGo.transform.position.x - Player.transform.position.x));
-            GUI.Label(new Rect(Screen.width - 200f, Screen.height * 0.4f, 190f, 28f), "출구 >> " + meters + "m", labelStyle);
+            string label = open ? "출구 >> " + meters + "m" : "출구 잠김 · 남은 적 " + Enemy.All.Count;
+            GUI.Label(new Rect(Screen.width - 260f, Screen.height * 0.4f, 250f, 28f), label, labelStyle);
         }
     }
 

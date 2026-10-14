@@ -75,8 +75,14 @@ public class StageAutoShot : MonoBehaviour
         {
             var exit = GameObject.Find("Exit");
             GoTo(exit.transform.position.x - 0.2f);
-            yield return new WaitForSecondsRealtime(0.4f);
-            Report("at exit " + shotName);
+            yield return new WaitForSecondsRealtime(0.5f);
+            Report("exit touched with monsters left (" + shotName + ", must stay Playing)");
+            Shot(shotName + "_locked");
+
+            foreach (var e in Enemy.All.ToArray()) if (e != null) e.TakeHit(100000);
+            yield return WaitFor(() => gm.State == GameManager.GameState.Reward, 8f);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Report("exit open after the kills (" + shotName + ", must be Reward)");
             Shot(shotName);
             Invoke("ChooseReward", 0);
         }
