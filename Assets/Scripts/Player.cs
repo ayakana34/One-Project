@@ -35,6 +35,25 @@ public class Player : MonoBehaviour
     public SpriteRenderer bodyRenderer;
     public Transform aimMark;
 
+    [Tooltip("Optional 3D body (PlayerVisual prefab). When set, the square sprite is hidden.")]
+    public GameObject visualPrefab;
+
+    // State the 3D visual reads.
+    public Vector2 Aim { get; private set; } = Vector2.right;
+    public float MoveX => moveX;
+    public Vector2 DashDir => dashDir;
+    public bool HitInvulnerable => Time.time < hitInvulnUntil;
+    public bool IsGrounded() => GroundCollider() != null;
+    public event System.Action Threw;
+
+    // Delay between the click and the weapon leaving the hand (matches the throw animation; 0 = instant).
+    public float ThrowReleaseDelay { get; set; }
+
+    // Optional scripted input, used by the automatic play-mode check (Player3DAutoShot).
+    [System.NonSerialized] public float? testMoveX;
+    [System.NonSerialized] public Vector2? testAim;
+    [System.NonSerialized] public bool testJump, testDash, testThrow;
+
     Rigidbody2D rb;
     Collider2D col;
     Vector2 dashDir = Vector2.right;
@@ -43,6 +62,8 @@ public class Player : MonoBehaviour
     bool active, jumpRequested, wasDashing, ignoringPlatforms;
     Collider2D[] platforms;
     float platformIgnoreUntil;
+    float pendingThrowAt = -1f;
+    Vector2 pendingAim;
 
     void Awake()
     {
@@ -54,6 +75,16 @@ public class Player : MonoBehaviour
         rb.freezeRotation = true;
         rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
         rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+
+        if (visualPrefab != null)
+        {
+            // The collider stays as it is; only the drawing changes. Feet are at the bottom of the capsule.
+            var body = Instantiate(visualPrefab, transform);
+            body.transform.localPosition = new Vector3(0f, -0.5f, -0.6f);
+            var visual = body.GetComponent<Player3DVisual>();
+            if (visual != null) visual.Bind(this);
+            if (bodyRenderer != null) bodyRenderer.enabled = false;
+        }
     }
 
     void Update()
@@ -76,6 +107,12 @@ public class Player : MonoBehaviour
             if (DashCharges < MaxDashCharges) rechargeAt = Time.time + DashRechargeTime;
         }
 
+        if (pendingThrowAt >= 0f && Time.time >= pendingThrowAt)
+        {
+            pendingThrowAt = -1f;
+            if (!Dead) Weapon.Spawn(this, rb.position + pendingAim * 0.6f, pendingAim);
+        }
+
         if (!active)
         {
             moveX = 0f;
@@ -86,10 +123,16 @@ public class Player : MonoBehaviour
         Vector2 mouseWorld = Camera.main.ScreenToWorldPoint(mouse.position.ReadValue());
         Vector2 aim = mouseWorld - rb.position;
         aim = aim.sqrMagnitude > 0.0001f ? aim.normalized : Vector2.right;
+        if (testAim.HasValue) aim = testAim.Value;
+        Aim = aim;
 
-        moveX = (kb.dKey.isPressed ? 1 : 0) - (kb.aKey.isPressed ? 1 : 0);
+        moveX = testMoveX ?? (kb.dKey.isPressed ? 1 : 0) - (kb.aKey.isPressed ? 1 : 0);
 
-        if (kb.spaceKey.wasPressedThisFrame)
+        bool jumpPressed = kb.spaceKey.wasPressedThisFrame || testJump;
+        bool throwPressed = mouse.leftButton.wasPressedThisFrame || testThrow;
+        testJump = testThrow = false;
+
+        if (jumpPressed)
         {
             var ground = GroundCollider();
             if (ground != null)
@@ -107,7 +150,8 @@ public class Player : MonoBehaviour
             }
         }
 
-        bool dashPressed = kb.leftShiftKey.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame;
+        bool dashPressed = kb.leftShiftKey.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame || testDash;
+        testDash = false;
         if (dashPressed && !Dashing && DashCharges > 0)
         {
             if (DashCharges == MaxDashCharges) rechargeAt = Time.time + DashRechargeTime;
@@ -118,10 +162,19 @@ public class Player : MonoBehaviour
             UpdatePlatformIgnore();
         }
 
-        if (mouse.leftButton.wasPressedThisFrame && HasWeapon)
+        if (throwPressed && HasWeapon)
         {
             HasWeapon = false;
-            Weapon.Spawn(this, rb.position + aim * 0.6f, aim);
+            Threw?.Invoke();
+            if (ThrowReleaseDelay <= 0f)
+            {
+                Weapon.Spawn(this, rb.position + aim * 0.6f, aim);
+            }
+            else
+            {
+                pendingThrowAt = Time.time + ThrowReleaseDelay;
+                pendingAim = aim;
+            }
         }
 
         if (kb.qKey.wasPressedThisFrame && HasRecall && !HasWeapon && Weapon.Current != null && Time.time >= nextRecall)
@@ -197,7 +250,11 @@ public class Player : MonoBehaviour
         return null;
     }
 
-    public void PickUp() => HasWeapon = true;
+    public void PickUp()
+    {
+        HasWeapon = true;
+        pendingThrowAt = -1f;
+    }
 
     // Includes inactive platforms, so the platform pool of the stage maps can be switched on and off.
     public void RefreshPlatforms()

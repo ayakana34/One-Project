@@ -412,6 +412,21 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a02267fbff30bf644b9c2f1f28889d8b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Assembly-CSharp::GameManager
+  enemyHpGrowth: 0.3
+  enemyAttackGrowth: 0.6
+  bossHealFraction: 0.1
+  rareChance: 0.25
+  epicChance: 0.05
+  gruntMin: 3
+  gruntMax: 5
+  eliteMin: 1
+  eliteMax: 3
+  flyerMin: 1
+  flyerMax: 3
+  shooterMin: 1
+  shooterMax: 3
+  stage1Mix: 0.6
+  stage2Mix: 0.75
   weaponPrefab: {fileID: 2614391950579871068, guid: 34559465129ecb94196e6f3189e0c565, type: 3}
   bossPrefab: {fileID: 6631348005343077189, guid: 884b93df476f6ac47812f73fb083af09, type: 3}
   flyerPrefab: {fileID: 2807060466700949452, guid: 510ab20f5e534e64daf958d59a925f8a, type: 3}
@@ -419,6 +434,7 @@ MonoBehaviour:
   gruntPrefab: {fileID: 5127036400060144911, guid: 7182e04f3461958419dbed4cf69c3b39, type: 3}
   elitePrefab: {fileID: 5891049835770075296, guid: dad6cd2d00b4d8c43b1dc863a38ef418, type: 3}
   removePlatformsDuringBoss: 1
+  rewardAfterEveryStage: 1
 --- !u!4 &577256761
 Transform:
   m_ObjectHideFlags: 0
@@ -1810,6 +1826,7 @@ MonoBehaviour:
     defense: 0
   bodyRenderer: {fileID: 1328572218}
   aimMark: {fileID: 1584580304}
+  visualPrefab: {fileID: 3384203673806771364, guid: 3b96a01a6428f9c4c889953ef5392d78, type: 3}
 --- !u!70 &1724777643
 CapsuleCollider2D:
   m_ObjectHideFlags: 0

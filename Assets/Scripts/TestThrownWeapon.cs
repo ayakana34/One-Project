@@ -17,7 +17,7 @@ public class TestThrownWeapon : MonoBehaviour
     {
         var go = GameObject.CreatePrimitive(PrimitiveType.Cube);
         go.name = "ThrownWeapon";
-        Destroy(go.GetComponent<BoxCollider>());
+        DestroyImmediate(go.GetComponent<BoxCollider>());
         go.transform.position = pos;
         go.transform.localScale = new Vector3(0.5f, 0.1f, 0.1f);
         if (owner.weaponMaterial != null) go.GetComponent<Renderer>().sharedMaterial = owner.weaponMaterial;
