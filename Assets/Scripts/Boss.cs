@@ -23,6 +23,9 @@ public class Boss : Enemy
     public Sprite windupSprite;
     public Sprite chargeSprite;
 
+    [Header("Rock attack")]
+    public GameObject golemPrefab;
+
     // Test hooks: a fixed attack order and a forced enrage.
     [System.NonSerialized] public Attack[] testSequence;
     [System.NonSerialized] public bool forceEnraged;
@@ -208,7 +211,7 @@ public class Boss : Enemy
         if (this == null || LiveMinions() >= MinionCap) return;
         var gm = GameManager.Instance;
         if (gm == null) return;
-        minions.Add(gm.SpawnMinion(new Vector3(x, Col.bounds.min.y + 0.5f, 0f)));
+        minions.Add(gm.SpawnMinion(golemPrefab, new Vector3(x, Col.bounds.min.y + 0.5f, 0f)));
     }
 
     // ---- jump slam ----
