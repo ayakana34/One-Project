@@ -6,7 +6,7 @@ using UnityEngine;
 [InitializeOnLoad]
 public static class BossTestLauncher
 {
-    static string RunKey => "BossTestLauncher.Run.v5." + Application.dataPath;
+    static string RunKey => "BossTestLauncher.Run.v6." + Application.dataPath;
 
     static BossTestLauncher()
     {

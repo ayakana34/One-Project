@@ -77,6 +77,10 @@ public class Enemy : MonoBehaviour
         var p = GameManager.Instance.Player;
         if (p != null) Physics2D.IgnoreCollision(Col, p.Col);
 
+        // Monsters do not block each other either (a hatched golem can stand inside the boss), the same as with the player.
+        foreach (var other in All)
+            if (other != null && other != this && other.Col != null) Physics2D.IgnoreCollision(Col, other.Col);
+
         if (IgnorePlatforms)
         {
             foreach (var effector in FindObjectsByType<PlatformEffector2D>(FindObjectsSortMode.None))

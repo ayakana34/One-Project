@@ -54,6 +54,9 @@ public class BossAutoShot : MonoBehaviour
                 yield return new WaitForSecondsRealtime(0.2f);
             }
             var boss = Boss.Current;
+            if (boss != null)
+                foreach (var e in Enemy.All)
+                    if (e != null && e != boss) { Debug.Log("[Boss] boss vs " + e.name + " ignore collision: " + Physics2D.GetIgnoreCollision(boss.Col, e.Col)); break; }
             Debug.Log("[Boss] after " + tag + ": hp=" + gm.Player.Hp + " enemies=" + Enemy.All.Count + " bossPos=" + (boss != null ? boss.transform.position.ToString("F1") : "none"));
         }
 
