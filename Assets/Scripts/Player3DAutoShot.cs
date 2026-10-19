@@ -33,7 +33,12 @@ public class Player3DAutoShot : MonoBehaviour
 
         void Shot(string name)
         {
+            float oldSize = cam.orthographicSize;
+            Vector3 oldPos = cam.transform.position;
+            cam.orthographicSize = 3.0f; // close-up
             if (follow != null) follow.SnapNow();
+            // the camera only follows sideways, so lift it to the player's height for the close-up
+            var cp = cam.transform.position; cp.y = player.transform.position.y + 0.9f; cam.transform.position = cp;
             cam.targetTexture = rt;
             cam.Render();
             RenderTexture.active = rt;
@@ -54,6 +59,9 @@ public class Player3DAutoShot : MonoBehaviour
             crop.Apply();
             File.WriteAllBytes(Path.Combine(dir, "p3d_" + name + ".png"), crop.EncodeToPNG());
             Destroy(crop);
+            cam.orthographicSize = oldSize;
+            cam.transform.position = oldPos;
+            if (follow != null) follow.SnapNow();
         }
 
         yield return new WaitForSecondsRealtime(1f);
@@ -69,6 +77,35 @@ public class Player3DAutoShot : MonoBehaviour
         var vis = player.GetComponentInChildren<Player3DVisual>();
         Debug.Log("[Player3D] renderers enabled " + on + "/" + rends.Length + ", visual pos " + (vis != null ? vis.transform.position.ToString("F2") : "none") + ", player " + player.transform.position.ToString("F2"));
         Shot("idle");
+        var daggerAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Dagger.prefab");
+        if (daggerAsset != null)
+        {
+            var d = Instantiate(daggerAsset, player.transform.position + new Vector3(0.9f, 0.9f, -0.5f), Quaternion.Euler(0f, 0f, 25f));
+            Debug.Log("[Dagger] guid->path " + UnityEditor.AssetDatabase.GUIDToAssetPath("64238fa1304b14c41b2e6cfb360de48e")
+                + " | load mat " + (UnityEditor.AssetDatabase.LoadAssetAtPath<Material>("Assets/Art/Dagger/Dagger_Blade.mat") != null)
+                + " | load mesh " + (UnityEditor.AssetDatabase.LoadAssetAtPath<Mesh>("Assets/Art/Dagger/DaggerBlade.mesh") != null)
+                + " | all at mat path " + string.Join(",", System.Array.ConvertAll(UnityEditor.AssetDatabase.LoadAllAssetsAtPath("Assets/Art/Dagger/Dagger_Blade.mat"), o => o == null ? "null" : o.GetType().Name + ":" + o.name)));
+            foreach (var r in d.GetComponentsInChildren<Renderer>())
+            {
+                var m = r.sharedMaterial;
+                Debug.Log("[Dagger] " + r.name + " mat=" + (m != null ? m.name + " shader=" + (m.shader != null ? m.shader.name + " supported=" + m.shader.isSupported : "null") : "null")
+                    + " bounds=" + r.bounds.ToString("F2"));
+            }
+            Shot("dagger_closeup");
+            Destroy(d);
+
+            var weaponAsset = UnityEditor.AssetDatabase.LoadAssetAtPath<GameObject>("Assets/Prefabs/Weapon.prefab");
+            if (weaponAsset != null)
+            {
+                var wgo = Instantiate(weaponAsset, player.transform.position + new Vector3(1.0f, 0.6f, 0f), Quaternion.Euler(0f, 0f, 30f));
+                foreach (var c in wgo.GetComponents<Behaviour>()) if (c is Weapon) c.enabled = false;
+                foreach (var rb in wgo.GetComponents<Rigidbody2D>()) rb.simulated = false;
+                foreach (var r in wgo.GetComponentsInChildren<Renderer>())
+                    Debug.Log("[Dagger] weapon renderer " + r.name + " enabled=" + r.enabled + " mat=" + (r.sharedMaterial != null ? r.sharedMaterial.name : "null") + " bounds=" + r.bounds.extents.ToString("F2"));
+                Shot("weapon_prefab");
+                Destroy(wgo);
+            }
+        }
         yield return new WaitForSecondsRealtime(0.5f);
         Shot("idle2");
 
