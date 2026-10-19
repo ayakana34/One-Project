@@ -12,6 +12,7 @@ public class Enemy : MonoBehaviour
     [Header("Sprite (optional, the shape is used when empty)")]
     public Sprite idleSprite;
     public float visualScale = 1f;
+    [System.NonSerialized] public Color tint = Color.white; // e.g. stone grey for the boss's golems, red when the boss is enraged
 
     public Collider2D Col { get; private set; }
     public int Hp => hp;
@@ -83,7 +84,7 @@ public class Enemy : MonoBehaviour
         }
     }
 
-    void OnDestroy() => All.Remove(this);
+    protected virtual void OnDestroy() => All.Remove(this);
 
     void Update()
     {
@@ -113,8 +114,8 @@ public class Enemy : MonoBehaviour
 
         // Sprites cannot get brighter by tinting, so the hit flash is a red tint and the telegraph blink stays yellow.
         if (Time.time < flashUntil) visual.color = new Color(1f, 0.45f, 0.45f);
-        else if (telegraphing) visual.color = (int)(Time.time * 12f) % 2 == 0 ? new Color(1f, 0.85f, 0.4f) : Color.white;
-        else visual.color = Color.white;
+        else if (telegraphing) visual.color = (int)(Time.time * 12f) % 2 == 0 ? new Color(1f, 0.85f, 0.4f) : tint;
+        else visual.color = tint;
     }
 
     void FixedUpdate()

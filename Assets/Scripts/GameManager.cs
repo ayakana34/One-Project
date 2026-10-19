@@ -295,6 +295,17 @@ public class GameManager : MonoBehaviour
         enemy.ScaleStats(1f + enemyHpGrowth * (Round - 1), 1f + enemyAttackGrowth * (Round - 1));
     }
 
+    // A small stone golem (a weaker, smaller grunt) that the boss's rocks hatch.
+    public Enemy SpawnMinion(Vector3 position)
+    {
+        var enemy = Instantiate(gruntPrefab, position, Quaternion.identity).GetComponent<Enemy>();
+        enemy.transform.localScale *= 0.75f;
+        enemy.ScaleStats((1f + enemyHpGrowth * (Round - 1)) * 0.6f, (1f + enemyAttackGrowth * (Round - 1)) * 0.7f);
+        enemy.aggroRange = 1000f;
+        enemy.tint = new Color(0.72f, 0.66f, 0.6f);
+        return enemy;
+    }
+
     void SpawnBoss()
     {
         float x = Player.transform.position.x < currentMap.CenterX ? 7f : -7f;
