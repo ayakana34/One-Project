@@ -93,7 +93,8 @@ public class StageAutoShot : MonoBehaviour
             yield return WaitFor(() => Enemy.All.Count == 0, 3f);
             yield return new WaitForSecondsRealtime(0.3f);
             Shot(shotName + "_open");
-            GoTo(exit.transform.position.x - 0.2f);
+            // the player is already standing in the door, so the next stage usually starts by itself
+            if (Field("stage") != nextStage) GoTo(exit.transform.position.x - 0.2f);
             yield return WaitFor(() => Field("stage") == nextStage, 4f);
             Report("left through the open exit (" + shotName + ", must be stage " + nextStage + " without a reward screen)");
         }
@@ -144,9 +145,7 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(1.8f);
         Shot("3_start");
         var exitGo = GameObject.Find("Exit");
-        GoTo(exitGo.transform.position.x - 0.2f);
-        yield return new WaitForSecondsRealtime(0.5f);
-        Report("rune room exit before the rune (must stay in stage 2, the rune room)");
+        Debug.Log("[Stages] rune room exit open before the rune (must be True, the rune is optional): " + typeof(GameManager).GetProperty("ExitOpen", All).GetValue(gm));
         var rune = FindFirstObjectByType<RuneItem>();
         Debug.Log("[Stages] rune object: " + (rune != null ? rune.transform.position.ToString("F1") : "none"));
         gm.Player.Teleport(new Vector2(rune.transform.position.x, rune.transform.position.y - 0.3f));

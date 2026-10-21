@@ -494,8 +494,8 @@ public class GameManager : MonoBehaviour
     }
 
     // Stages 1 and 2 are left through the exit, which opens once every monster of the stage is dead;
-    // the rune room's exit opens when the recall rune has been taken.
-    bool ExitOpen => spawnAt < 0f && (stage == StageRune ? runeTaken : stage != StageBoss && Enemy.All.Count == 0);
+    // the rune room's exit is always open (taking the recall rune there is optional).
+    bool ExitOpen => spawnAt < 0f && (stage == StageRune || (stage != StageBoss && Enemy.All.Count == 0));
 
     void UpdateExitDoor()
     {
