@@ -6,7 +6,7 @@ public class Shooter : Enemy
     const float FireCooldown = 2.4f;
     const float TelegraphTime = 0.6f;
     const float BulletSpeed = 7f;
-    const int BulletCount = 5;
+    const int BulletCount = 1; // a single aimed shot
     const float SpreadDegrees = 18f;
 
     public GameObject bulletPrefab;

@@ -81,7 +81,7 @@ public class StageAutoShot : MonoBehaviour
             Debug.Log("[Stages] map check " + label + " (" + map.name + ", " + map.Width + " wide): " + (problems.Count == 0 ? "ok" : string.Join("; ", problems)));
         }
 
-        IEnumerator LeaveByExit(string shotName)
+        IEnumerator LeaveByExit(string shotName, int nextStage)
         {
             var exit = GameObject.Find("Exit");
             GoTo(exit.transform.position.x - 0.2f);
@@ -90,11 +90,12 @@ public class StageAutoShot : MonoBehaviour
             Shot(shotName + "_locked");
 
             foreach (var e in Enemy.All.ToArray()) if (e != null) e.TakeHit(100000);
-            yield return WaitFor(() => gm.State == GameManager.GameState.Reward, 8f);
+            yield return WaitFor(() => Enemy.All.Count == 0, 3f);
             yield return new WaitForSecondsRealtime(0.3f);
-            Report("exit open after the kills (" + shotName + ", must be Reward)");
-            Shot(shotName);
-            Invoke("ChooseReward", 0);
+            Shot(shotName + "_open");
+            GoTo(exit.transform.position.x - 0.2f);
+            yield return WaitFor(() => Field("stage") == nextStage, 4f);
+            Report("left through the open exit (" + shotName + ", must be stage " + nextStage + " without a reward screen)");
         }
 
         yield return new WaitForSecondsRealtime(1f);
@@ -116,7 +117,7 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(1.2f);
         gm.Player.Heal(1f);
         Shot("1_mid");
-        yield return LeaveByExit("reward_after_1");
+        yield return LeaveByExit("exit_1", 1);
 
         // Stage 2
         yield return new WaitForSecondsRealtime(0.4f);
@@ -132,7 +133,7 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(1.0f);
         gm.Player.Heal(1f);
         Shot("2_mid");
-        yield return LeaveByExit("reward_after_2");
+        yield return LeaveByExit("exit_2", 2);
 
         // Rune room: the exit stays closed until the rune is taken
         yield return new WaitForSecondsRealtime(0.4f);

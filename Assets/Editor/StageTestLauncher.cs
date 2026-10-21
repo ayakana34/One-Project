@@ -6,7 +6,7 @@ using UnityEngine;
 [InitializeOnLoad]
 public static class StageTestLauncher
 {
-    static string RunKey => "StageTestLauncher.Run.v11." + Application.dataPath;
+    static string RunKey => "StageTestLauncher.Run.v13." + Application.dataPath;
 
     static StageTestLauncher()
     {

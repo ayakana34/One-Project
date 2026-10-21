@@ -27,8 +27,8 @@ public class GameManager : MonoBehaviour
     public GameObject gruntPrefab;
     public GameObject elitePrefab;
     public bool removePlatformsDuringBoss = true;
-    [Tooltip("Open a reward screen every time a stage is left (otherwise only after the boss).")]
-    public bool rewardAfterEveryStage = true;
+    [Tooltip("Open a reward card screen every time a stage is left (off: stages just follow each other).")]
+    public bool rewardAfterEveryStage = false;
 
     public Player Player { get; private set; }
     public GameState State { get; private set; }

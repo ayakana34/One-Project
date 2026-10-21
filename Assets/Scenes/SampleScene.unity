@@ -434,7 +434,7 @@ MonoBehaviour:
   gruntPrefab: {fileID: 5127036400060144911, guid: 7182e04f3461958419dbed4cf69c3b39, type: 3}
   elitePrefab: {fileID: 5891049835770075296, guid: dad6cd2d00b4d8c43b1dc863a38ef418, type: 3}
   removePlatformsDuringBoss: 1
-  rewardAfterEveryStage: 1
+  rewardAfterEveryStage: 0
 --- !u!4 &577256761
 Transform:
   m_ObjectHideFlags: 0
