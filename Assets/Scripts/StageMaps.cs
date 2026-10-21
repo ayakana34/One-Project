@@ -14,11 +14,16 @@ public struct EnemySpawn
 // Hand-made stage layouts: solid terrain (steps, hills, pillars), one-way platforms and a fixed set of monsters.
 // There are no pits or spikes on purpose: the thrown weapon must never get lost, so the floor is closed everywhere and
 // every surface can be reached by jumping (jump height is about 2.8, steps and platform gaps stay at 2.5 or less).
+// The three long maps are generated from a design script that checks reachability; StageMaps.Validate repeats the check.
 public class StageMapDef
 {
     public string name;
     public float minX, maxX;
     public float playerStartX;
+    public Color backgroundColor = new Color(0.17f, 0.18f, 0.22f);
+    public Color groundColor = new Color(0.36f, 0.37f, 0.43f);
+    public Color stripeColor = new Color(0.22f, 0.22f, 0.26f);
+    public Vector2? runePos;    // the recall rune of the rune room
     public Vector3[] blocks;    // solid terrain standing on the floor: x, top y, width
     public Vector3[] platforms; // one-way platforms: x, top y, width
     public EnemySpawn[] enemies;
@@ -41,8 +46,8 @@ public static class StageMaps
 {
     public const float FloorTop = -6f;
     public const float Tier1 = -3.6f, Tier2 = -1.2f, Tier3 = 1.2f;
-    public const int MaxPlatforms = 8;
-    public const int MaxBlocks = 12;
+    public const int MaxPlatforms = 16;
+    public const int MaxBlocks = 24;
 
     const float ShooterHoverY = 4.3f;
     const float MaxClimb = 2.5f; // the player jumps about 2.8 high
@@ -68,120 +73,104 @@ public static class StageMaps
     static EnemySpawn F(float x, float y) => Spawn(EnemyKind.Flyer, x, y);
     static EnemySpawn S(float x) => Spawn(EnemyKind.Shooter, x, ShooterHoverY);
 
-    // Stage 1: two layouts (round 1 uses A, round 2 uses B, then A again ...). Ground and air monsters are mixed.
-    public static readonly StageMapDef[] Stage1 =
+    // Stage 1: the outskirts. A hill with a peak, rocks, a ruin of pillars, a stepped mesa and a platform archipelago.
+    public static readonly StageMapDef Stage1 = new StageMapDef
     {
-        // A: stairs up to a plateau, a low valley, a hill with a peak, then a few pillars before the exit.
-        new StageMapDef
+        name = "Stage 1", minX = -36f, maxX = 36f, playerStartX = -33f,
+        backgroundColor = new Color(0.17f, 0.18f, 0.24f),
+        groundColor = new Color(0.36f, 0.38f, 0.46f),
+        stripeColor = new Color(0.22f, 0.23f, 0.3f),
+        blocks = new[]
         {
-            name = "Stage 1 A", minX = -20f, maxX = 20f, playerStartX = -17f,
-            blocks = new[]
-            {
-                B(-12.5f, -5.0f, 3f), B(-10f, -4.0f, 2f), B(-8f, -3.0f, 2f), B(-5f, -3.0f, 4f),
-                B(-2f, -4.0f, 2f), B(0f, -5.0f, 2f),
-                B(6.5f, -4.5f, 5f), B(6.5f, -3.0f, 2f),
-                B(11.5f, -4.4f, 1.8f), B(13.5f, -3.2f, 2.2f), B(15.5f, -4.4f, 1.8f)
-            },
-            platforms = new[]
-            {
-                P(-5f, Tier2, 3.2f), P(2.5f, Tier1, 3f), P(6.5f, -0.8f, 3f), P(13.5f, -1.8f, 3.5f)
-            },
-            enemies = new[]
-            {
-                G(-5.5f), G(2f), G(5f), G(15.5f),
-                E(3.5f), E(10f),
-                F(-8f, 2.5f), F(8f, 3f),
-                S(0f)
-            }
+                B(-24f, -4.7f, 9f), B(-24f, -3.1f, 5f), B(-16f, -5.2f, 2f), B(-13f, -4.6f, 2.4f),
+                B(-10f, -5f, 1.8f), B(-5f, -4f, 1.6f), B(-1f, -3.8f, 1.6f), B(3f, -4.2f, 1.6f),
+                B(12f, -4.2f, 10f), B(12f, -2.6f, 6.6f), B(12f, -1f, 3.2f), B(20f, -5f, 2.5f),
+                B(24f, -4.4f, 2.5f), B(28f, -5f, 2.5f)
         },
-        // B: a shelf with a tower, a platform ladder over the valley, then stepped mounds.
-        new StageMapDef
+        platforms = new[]
         {
-            name = "Stage 1 B", minX = -20f, maxX = 20f, playerStartX = -17f,
-            blocks = new[]
-            {
-                B(-13f, -5.0f, 3f), B(-10.5f, -4.0f, 2f),
-                B(-3.5f, -4.6f, 5f), B(-4f, -3.0f, 2f),
-                B(6f, -4.8f, 4f), B(8.5f, -3.6f, 3f), B(11f, -4.8f, 2f),
-                B(15.5f, -4.5f, 2f)
-            },
-            platforms = new[]
-            {
-                P(-10.5f, -1.8f, 3f), P(-4f, -0.8f, 3f), P(1f, Tier1, 3.5f), P(1f, Tier2, 3.5f),
-                P(1f, Tier3, 3f), P(8.5f, Tier2, 3.5f), P(14f, Tier1, 3f)
-            },
-            enemies = new[]
-            {
-                G(-7.5f), G(-3.5f), G(6f), G(13.5f),
-                E(1f), E(8.5f),
-                F(-9f, 2.5f), F(2f, 3.5f),
-                S(10f)
-            }
+                P(-24f, -0.8f, 4f), P(-17f, -3.4f, 3f), P(-12.5f, -2.8f, 3f), P(-3f, -1.4f, 5.5f),
+                P(3f, -1.6f, 3f), P(12f, 0.6f, 5f), P(19f, -3.4f, 3f), P(23f, -1.6f, 3f),
+                P(27f, -3.2f, 3f)
+        },
+        enemies = new[]
+        {
+                G(-20.5f), G(-13f), G(-6.5f), G(1f),
+                G(7.8f), G(16.5f), G(26f), E(-1f),
+                E(12f), E(24f), F(-18f, 3f), F(-3f, 3.5f),
+                F(15f, 3.5f), F(22f, 2.5f), S(-12f), S(20f)
         }
     };
 
-    // Stage 2: longer maps with more monsters.
-    public static readonly StageMapDef[] Stage2 =
+    // Stage 2: the ruined citadel. A big hill, a colonnade, a rampart with towers, floating gardens, the citadel and a descent.
+    public static readonly StageMapDef Stage2 = new StageMapDef
     {
-        // A: a long staircase up, a plateau, a ruin of pillars and a low shelf with a tower.
-        new StageMapDef
+        name = "Stage 2", minX = -46f, maxX = 46f, playerStartX = -43f,
+        backgroundColor = new Color(0.2f, 0.16f, 0.21f),
+        groundColor = new Color(0.44f, 0.36f, 0.44f),
+        stripeColor = new Color(0.27f, 0.21f, 0.28f),
+        blocks = new[]
         {
-            name = "Stage 2 A", minX = -22f, maxX = 22f, playerStartX = -19f,
-            blocks = new[]
-            {
-                B(-15f, -5.0f, 3f), B(-12.5f, -4.0f, 2f), B(-10.5f, -3.0f, 2f), B(-7f, -3.0f, 5f),
-                B(-4f, -4.2f, 2f), B(-2f, -5.2f, 2f),
-                B(4f, -4.4f, 1.6f), B(8f, -4.0f, 2f),
-                B(12f, -4.6f, 6f), B(13f, -3.2f, 2f), B(17f, -4.4f, 2.5f)
-            },
-            platforms = new[]
-            {
-                P(-7f, Tier2, 3.5f), P(1.5f, Tier1, 3.5f), P(1.5f, Tier2, 3f), P(8f, -1.6f, 3.5f),
-                P(12.5f, -0.8f, 3.5f), P(17f, -2.0f, 3f)
-            },
-            enemies = new[]
-            {
-                G(-6f), G(0.5f), G(10.5f), G(16.5f),
-                E(1.5f), E(11f),
-                F(-8f, 3f), F(-1f, 2.5f), F(9f, 3.5f), F(18f, 2.5f),
-                S(-5f), S(6f), S(15f)
-            }
+                B(-33f, -4.6f, 12f), B(-33f, -3f, 8f), B(-33f, -1.4f, 4f), B(-24f, -4f, 1.6f),
+                B(-20f, -3.8f, 1.6f), B(-16f, -4.2f, 1.6f), B(-6f, -4.8f, 12f), B(-6f, -3.2f, 8f),
+                B(-8f, -1.6f, 2f), B(-4f, -1.6f, 2f), B(3f, -5.3f, 2f), B(9f, -5.1f, 2.4f),
+                B(23f, -4.4f, 12f), B(23f, -2.8f, 8f), B(23f, -1.2f, 4f), B(35f, -4.8f, 3f),
+                B(38.5f, -4.2f, 2.4f)
         },
-        // B: a dip, a big mountain with a peak in the middle and stepped ground on the right.
-        new StageMapDef
+        platforms = new[]
         {
-            name = "Stage 2 B", minX = -22f, maxX = 22f, playerStartX = -19f,
-            blocks = new[]
-            {
-                B(-16f, -5.0f, 4f), B(-12.5f, -4.0f, 3f), B(-9.5f, -5.0f, 3f),
-                B(0f, -4.6f, 11f), B(0f, -3.0f, 4f),
-                B(11f, -4.0f, 3f), B(14f, -5.0f, 3f), B(17.5f, -4.4f, 2f)
-            },
-            platforms = new[]
-            {
-                P(-16f, -2.6f, 3f), P(-12.5f, -1.6f, 3f), P(-7f, Tier1, 3f), P(0f, -0.6f, 4f),
-                P(7f, Tier1, 3.5f), P(11f, -1.6f, 3f), P(14.5f, -2.6f, 3f)
-            },
-            enemies = new[]
-            {
-                G(-6.5f), G(8f), G(14f),
-                E(-1f), E(11f),
-                F(-13f, 3f), F(-4f, 3.5f), F(7f, 2.5f), F(16f, 3.5f),
-                S(-8f), S(3f), S(13f)
-            }
+                P(-33f, 0.2f, 4f), P(-20f, -1.4f, 6f), P(-6f, 0.4f, 3f), P(2f, -3.6f, 3f),
+                P(5f, -1.2f, 3f), P(8f, 1.2f, 3f), P(11f, -1.2f, 3f), P(23f, 0.4f, 4f),
+                P(16f, -2f, 3f), P(30f, -2f, 3f), P(35f, -2.6f, 3.2f), P(39f, -2f, 2.5f)
+        },
+        enemies = new[]
+        {
+                G(-36f), G(-26f), G(-22f), G(-13f),
+                G(-1f), G(7f), G(26f), G(36f),
+                E(-33f), E(-6f), E(23f), E(38.5f),
+                F(-30f, 3f), F(-18f, 3.5f), F(-4f, 3f), F(6f, 3.5f),
+                F(14f, 2.5f), F(28f, 3f), F(34f, 3.5f), S(-25f),
+                S(0f), S(19f), S(32f)
         }
     };
 
-    // Stage 3 (boss): the single-screen arena.
+    // Stage 3: the rune room. Climb the stepped mound to the recall rune, then leave through the exit.
+    public static readonly StageMapDef RuneRoom = new StageMapDef
+    {
+        name = "Rune", minX = -30f, maxX = 30f, playerStartX = -27f,
+        backgroundColor = new Color(0.12f, 0.19f, 0.2f),
+        groundColor = new Color(0.32f, 0.46f, 0.46f),
+        stripeColor = new Color(0.17f, 0.26f, 0.27f),
+        runePos = new Vector2(12f, -0.6f),
+        blocks = new[]
+        {
+                B(-20f, -5f, 3f), B(-14f, -4.4f, 2.4f), B(-3f, -4.8f, 3f), B(0f, -3.8f, 3f),
+                B(12f, -4.8f, 14f), B(12f, -3.4f, 10.8f), B(12f, -2f, 7.6f), B(12f, -0.6f, 4.4f),
+                B(22f, -5f, 2.4f)
+        },
+        platforms = new[]
+        {
+                P(-17f, -3f, 3.5f), P(-8f, -3f, 3f), P(3f, -2f, 3f)
+        },
+        enemies = new[]
+        {
+                G(-17f), G(-9f), G(2.5f), E(6f),
+                F(-12f, 3f), F(4f, 3.5f), S(-5f), S(16f)
+        }
+    };
+
+    // The boss arena: a single screen.
     public static readonly StageMapDef Arena = new StageMapDef
     {
         name = "Arena", minX = -10f, maxX = 10f, playerStartX = 0f,
+        backgroundColor = new Color(0.22f, 0.12f, 0.13f), groundColor = new Color(0.46f, 0.3f, 0.3f), stripeColor = new Color(0.28f, 0.16f, 0.17f),
         blocks = new Vector3[0], platforms = new Vector3[0], enemies = new EnemySpawn[0]
     };
 
     public static readonly StageMapDef ArenaWithPlatforms = new StageMapDef
     {
         name = "Arena", minX = -10f, maxX = 10f, playerStartX = 0f,
+        backgroundColor = new Color(0.22f, 0.12f, 0.13f), groundColor = new Color(0.46f, 0.3f, 0.3f), stripeColor = new Color(0.28f, 0.16f, 0.17f),
         blocks = new Vector3[0],
         platforms = new[] { P(-5f, Tier1, 4f), P(5f, Tier1, 4f), P(0f, Tier2, 4f) },
         enemies = new EnemySpawn[0]
@@ -231,6 +220,12 @@ public static class StageMaps
                 x += 0.5f;
             }
         }
+
+        // platforms need head room above the terrain below them
+        foreach (var p in map.platforms)
+            foreach (var b in map.blocks)
+                if (Mathf.Abs(p.x - b.x) < (p.z + b.z) * 0.5f && p.y - 0.4f < b.y + 1.1f)
+                    problems.Add("platform x=" + p.x.ToString("F1") + " is too low above the block at x=" + b.x.ToString("F1"));
 
         float exitX = map.maxX - 1.5f;
         if (map.SurfaceTop(map.playerStartX) > FloorTop + 0.01f) problems.Add("player start is not on the floor");

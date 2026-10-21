@@ -6,12 +6,12 @@ using UnityEngine.SceneManagement;
 
 public class GameManager : MonoBehaviour
 {
-    public enum GameState { Title, Playing, Reward, Lost, Paused }
+    public enum GameState { Title, Playing, Reward, Lost, Paused, Won }
 
     public static GameManager Instance { get; private set; }
 
     const float FloorY = -6f;
-    const int StageGround = 0, StageAir = 1, StageBoss = 2;
+    const int StageGround = 0, StageAir = 1, StageRune = 2, StageBoss = 3, StageCount = 4;
     const int DashChargeCap = 3;
 
     public float enemyHpGrowth = 0.3f;
@@ -32,7 +32,7 @@ public class GameManager : MonoBehaviour
 
     public Player Player { get; private set; }
     public GameState State { get; private set; }
-    public int Round { get; private set; } = 1;
+    public int Round { get; private set; } = 1; // one run has no repeat, so monsters are never scaled up
 
     class RewardType
     {
@@ -49,7 +49,6 @@ public class GameManager : MonoBehaviour
     {
         public RewardType type;
         public int tier;
-        public bool isRecall;
         public int Value => type.values[tier];
     }
 
@@ -65,10 +64,15 @@ public class GameManager : MonoBehaviour
     readonly List<Card> choices = new();
     GameObject[] platforms;
     GameObject[] terrain;
+    GameObject runeGo;
+    bool runeTaken;
+    float runeMessageUntil, runStartRealtime, clearSeconds;
+    SpriteRenderer bgRenderer, floorRenderer;
+    readonly List<SpriteRenderer> terrainRenderers = new();
     GUIStyle labelStyle, bigStyle, centerStyle, cardStyle;
     int stage = StageGround, pendingStage, lastHeal;
     float spawnAt = -1f;
-    StageMapDef currentMap = StageMaps.Stage1[0];
+    StageMapDef currentMap = StageMaps.Stage1;
     Transform bgT, ceilingT, floorT, leftT, rightT;
     GameObject exitGo;
     SpriteRenderer exitRenderer;
@@ -192,24 +196,21 @@ public class GameManager : MonoBehaviour
             return;
         }
 
-        // Stages 1 and 2 are left through the exit door; the boss stage ends when the boss is dead.
-        if (stage == StageBoss && Enemy.All.Count == 0 && NextStage() >= 0) OpenReward();
+        // Stages 1 to 3 are left through the exit door; the game is cleared when the boss is dead.
+        if (stage == StageBoss && Enemy.All.Count == 0) OnBossDefeated();
     }
 
     bool StageReady(int s) => s switch
     {
-        StageGround or StageAir => gruntPrefab != null && elitePrefab != null && flyerPrefab != null && shooterPrefab != null,
+        StageGround or StageAir or StageRune => gruntPrefab != null && elitePrefab != null && flyerPrefab != null && shooterPrefab != null,
         _ => bossPrefab != null
     };
 
+    // Stage 1 -> 2 -> rune room -> boss; the run ends with the boss.
     int NextStage()
     {
-        for (int i = 1; i <= 3; i++)
-        {
-            int s = (stage + i) % 3;
-            if (StageReady(s)) return s;
-        }
-        return -1;
+        int s = stage + 1;
+        return s < StageCount && StageReady(s) ? s : -1;
     }
 
     int RollTier()
@@ -222,15 +223,11 @@ public class GameManager : MonoBehaviour
 
     void OpenReward()
     {
-        // Health is only restored when the boss reward opens; leaving stages 1 and 2 heals nothing.
-        lastHeal = stage == StageBoss ? Player.Heal(bossHealFraction) : 0;
-
-        bool recallReward = stage == StageBoss && !Player.HasRecall;
+        lastHeal = 0; // rewards are the only way to get stronger or healthier
 
         choices.Clear();
-        if (recallReward) choices.Add(new Card { tier = 2, isRecall = true });
         var candidates = types.FindAll(t => t.available());
-        for (int i = 0; i < 3 && candidates.Count > 0 && !recallReward; i++)
+        for (int i = 0; i < 3 && candidates.Count > 0; i++)
         {
             int total = 0;
             foreach (var t in candidates) total += t.weight;
@@ -261,8 +258,7 @@ public class GameManager : MonoBehaviour
         if (index < 0 || index >= choices.Count) return;
 
         var card = choices[index];
-        if (card.isRecall) Player.GrantRecall();
-        else card.type.apply(card.Value);
+        card.type.apply(card.Value);
         choices.Clear();
 
         Time.timeScale = 1f;
@@ -368,6 +364,15 @@ public class GameManager : MonoBehaviour
         exitBox.isTrigger = true;
         exitGo.AddComponent<StageExit>();
 
+        runeGo = new GameObject("RecallRune");
+        runeGo.AddComponent<RuneItem>();
+        runeGo.SetActive(false);
+
+        if (bgT != null) bgRenderer = bgT.GetComponent<SpriteRenderer>();
+        if (floorT != null) floorRenderer = floorT.GetComponent<SpriteRenderer>();
+        if (terrain != null)
+            foreach (var t in terrain) terrainRenderers.Add(t.GetComponent<SpriteRenderer>());
+
         var cam = Camera.main;
         if (cam != null)
         {
@@ -377,20 +382,23 @@ public class GameManager : MonoBehaviour
         }
     }
 
-    // The two layouts of a stage alternate with the round (round 1: A, round 2: B, ...), so every tester sees the same.
-    StageMapDef PickMap(StageMapDef[] maps) => maps[(Round - 1) % maps.Length];
+    StageMapDef MapFor(int s) => s switch
+    {
+        StageGround => StageMaps.Stage1,
+        StageAir => StageMaps.Stage2,
+        StageRune => StageMaps.RuneRoom,
+        _ => removePlatformsDuringBoss ? StageMaps.Arena : StageMaps.ArenaWithPlatforms
+    };
 
     // Loads the map of a stage (geometry, platforms, exit, camera) and puts the player at its start.
     void BeginStage(int s, bool first)
     {
         stage = s;
         pendingStage = s;
-        if (s == StageGround && !first) Round++;
+        runeTaken = false;
+        if (first) runStartRealtime = Time.realtimeSinceStartup;
 
-        StageMapDef map;
-        if (s == StageGround) map = PickMap(StageMaps.Stage1);
-        else if (s == StageAir) map = PickMap(StageMaps.Stage2);
-        else map = removePlatformsDuringBoss ? StageMaps.Arena : StageMaps.ArenaWithPlatforms;
+        var map = MapFor(s);
 
         ClearField();
         ApplyMap(map, s != StageBoss);
@@ -448,6 +456,13 @@ public class GameManager : MonoBehaviour
             }
         }
 
+        if (bgRenderer != null) bgRenderer.color = map.backgroundColor;
+        if (floorRenderer != null) floorRenderer.color = map.groundColor;
+        foreach (var r in terrainRenderers) if (r != null) r.color = map.groundColor;
+
+        runeGo.SetActive(map.runePos.HasValue && !runeTaken);
+        if (map.runePos.HasValue) runeGo.transform.position = new Vector3(map.runePos.Value.x, map.runePos.Value.y + 0.9f, 0f);
+
         exitGo.SetActive(withExit);
         exitGo.transform.position = new Vector3(map.maxX - 1.5f, FloorY + 1.2f, 0f);
 
@@ -458,7 +473,6 @@ public class GameManager : MonoBehaviour
             var go = new GameObject("BgStripe");
             var sr = go.AddComponent<SpriteRenderer>();
             sr.sprite = squareSprite;
-            sr.color = new Color(0.22f, 0.22f, 0.26f);
             sr.sortingOrder = -9;
             go.transform.localScale = new Vector3(0.35f, 12f, 1f);
             stripes.Add(go.transform);
@@ -467,6 +481,7 @@ public class GameManager : MonoBehaviour
         {
             bool on = i < needed;
             stripes[i].gameObject.SetActive(on);
+            stripes[i].GetComponent<SpriteRenderer>().color = map.stripeColor;
             if (on) stripes[i].position = new Vector3(map.minX + 2.5f + i * 5f, 0f, 0f);
         }
     }
@@ -478,8 +493,9 @@ public class GameManager : MonoBehaviour
         t.localScale = scale;
     }
 
-    // Stages 1 and 2 are left through the exit, which opens once every monster of the stage is dead.
-    bool ExitOpen => stage != StageBoss && spawnAt < 0f && Enemy.All.Count == 0;
+    // Stages 1 and 2 are left through the exit, which opens once every monster of the stage is dead;
+    // the rune room's exit opens when the recall rune has been taken.
+    bool ExitOpen => spawnAt < 0f && (stage == StageRune ? runeTaken : stage != StageBoss && Enemy.All.Count == 0);
 
     void UpdateExitDoor()
     {
@@ -490,7 +506,7 @@ public class GameManager : MonoBehaviour
     public void OnExitReached()
     {
         if (State != GameState.Playing || !ExitOpen) return;
-        if (rewardAfterEveryStage)
+        if (rewardAfterEveryStage && stage != StageRune)
         {
             OpenReward();
         }
@@ -521,6 +537,23 @@ public class GameManager : MonoBehaviour
     }
 
     public void OnPlayerDead() => State = GameState.Lost;
+
+    void OnBossDefeated()
+    {
+        clearSeconds = Time.realtimeSinceStartup - runStartRealtime;
+        State = GameState.Won;
+        Time.timeScale = 0f;
+    }
+
+    // The recall rune: taking it unlocks the recall skill (Q).
+    public void OnRuneCollected()
+    {
+        if (runeTaken || State != GameState.Playing) return;
+        runeTaken = true;
+        Player.GrantRecall();
+        if (runeGo != null) runeGo.SetActive(false);
+        runeMessageUntil = Time.unscaledTime + 6f;
+    }
 
     void StartGame()
     {
@@ -589,7 +622,7 @@ public class GameManager : MonoBehaviour
             "마우스 : 조준\n" +
             "마우스 좌클릭 : 무기 던지기\n" +
             "Shift / 마우스 우클릭 : 마우스 방향으로 대쉬\n" +
-            "Q : 무기 회수 (회수 스킬을 얻은 뒤)\n" +
+            "Q : 무기 회수 (회수의 룬을 얻은 뒤)\n" +
             "R : 다시 시작      Esc : 메뉴",
             controlsStyle);
     }
@@ -628,7 +661,7 @@ public class GameManager : MonoBehaviour
         }
         GUI.color = Color.white;
         GUI.Label(new Rect(16, 100, 500, 28), "남은 적: " + Enemy.All.Count, labelStyle);
-        GUI.Label(new Rect(16, 124, 500, 28), "스테이지 " + (stage + 1) + "/3   라운드 " + Round, labelStyle);
+        GUI.Label(new Rect(16, 124, 500, 28), StageName(stage), labelStyle);
         GUI.Label(new Rect(16, 148, 500, 28), "공격력 " + Player.stats.attack + "   방어력 " + Player.stats.defense, labelStyle);
         int nextLine = 172;
         if (Player.HasRecall)
@@ -654,7 +687,7 @@ public class GameManager : MonoBehaviour
 
         if (State == GameState.Playing && spawnAt >= 0f)
         {
-            string banner = pendingStage == StageGround ? "스테이지 1 · 라운드 " + Round : pendingStage == StageAir ? "스테이지 2" : "스테이지 3 · 보스";
+            string banner = StageName(pendingStage);
             GUI.Label(new Rect(0, Screen.height * 0.25f, Screen.width, 80), banner, bigStyle);
         }
 
@@ -665,9 +698,34 @@ public class GameManager : MonoBehaviour
         if (State == GameState.Lost)
         {
             GUI.Label(new Rect(0, 0, Screen.width, Screen.height), "게임 오버", bigStyle);
-            GUI.Label(new Rect(0, Screen.height * 0.5f + 40, Screen.width, 40), "도달한 라운드: " + Round + "   (R: 다시 시작)", centerStyle);
+            GUI.Label(new Rect(0, Screen.height * 0.5f + 40, Screen.width, 40), "도달한 곳: " + StageName(stage) + "   (R: 다시 시작)", centerStyle);
+        }
+
+        if (State == GameState.Won)
+        {
+            GUI.color = new Color(0f, 0f, 0f, 0.6f);
+            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
+            GUI.color = Color.white;
+            GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, 90), "게임 클리어!", bigStyle);
+            int sec = Mathf.RoundToInt(clearSeconds);
+            GUI.Label(new Rect(0, Screen.height * 0.3f + 90, Screen.width, 40), "클리어 시간 " + sec / 60 + "분 " + sec % 60 + "초", centerStyle);
+            GUI.Label(new Rect(0, Screen.height * 0.3f + 130, Screen.width, 40), "R: 다시 시작   Esc: 메뉴", centerStyle);
+        }
+
+        if (runeMessageUntil > Time.unscaledTime && State != GameState.Lost)
+        {
+            GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 80), "회수의 룬 획득!", bigStyle);
+            GUI.Label(new Rect(0, Screen.height * 0.2f + 70, Screen.width, 30), "Q : 던진 무기를 손으로 불러옵니다 (쿨타임 4초)", centerStyle);
         }
     }
+
+    static string StageName(int s) => s switch
+    {
+        StageGround => "스테이지 1",
+        StageAir => "스테이지 2",
+        StageRune => "스테이지 3 · 회수의 룬",
+        _ => "최종 스테이지 · 보스"
+    };
 
     void DrawRewards()
     {
@@ -676,7 +734,7 @@ public class GameManager : MonoBehaviour
         GUI.color = new Color(0f, 0f, 0f, 0.65f);
         GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
         GUI.color = Color.white;
-        GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 80), choices.Count == 1 && choices[0].isRecall ? "보스 처치 보상" : "보상을 선택하세요", bigStyle);
+        GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 80), "보상을 선택하세요", bigStyle);
         if (lastHeal > 0)
             GUI.Label(new Rect(0, Screen.height * 0.18f + 70, Screen.width, 30), "체력 " + lastHeal + " 회복", centerStyle);
 
@@ -688,9 +746,7 @@ public class GameManager : MonoBehaviour
         {
             var card = choices[i];
             var rect = new Rect(x0 + i * (w + gap), y0, w, h);
-            string text = card.isRecall
-                ? "[" + (i + 1) + "]\n회수 스킬\nQ키로 던진 무기를 불러옵니다\n(쿨타임 4초)"
-                : "[" + (i + 1) + "]\n" + TierPrefix[card.tier] + card.type.name + " +" + card.Value + "\n" + card.type.describe(card.Value);
+            string text = "[" + (i + 1) + "]\n" + TierPrefix[card.tier] + card.type.name + " +" + card.Value + "\n" + card.type.describe(card.Value);
 
             GUI.backgroundColor = TierColor[card.tier];
             if (GUI.Button(rect, text, cardStyle)) ChooseReward(i);

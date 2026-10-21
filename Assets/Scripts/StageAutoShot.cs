@@ -6,7 +6,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
-// Editor-only helper: plays through stage 1 -> 2 -> boss -> stage 1 (round 2) and saves screenshots
+// Editor-only helper: plays through stage 1 -> 2 -> rune room -> boss (game cleared) and saves screenshots
 // to Library/HoodedDiag/stage_*.png so the stage flow can be checked without watching the editor.
 public class StageAutoShot : MonoBehaviour
 {
@@ -63,9 +63,10 @@ public class StageAutoShot : MonoBehaviour
         {
             int active = FindObjectsByType<PlatformEffector2D>(FindObjectsInactive.Exclude, FindObjectsSortMode.None).Length;
             var exit = GameObject.Find("Exit");
-            Debug.Log("[Stages] " + label + ": stage=" + Field("stage") + " round=" + gm.Round + " state=" + gm.State
+            Debug.Log("[Stages] " + label + ": stage=" + Field("stage") + " state=" + gm.State
                 + " hp=" + gm.Player.Hp + "/" + gm.Player.MaxHp + " enemies=" + Enemy.All.Count + " platforms=" + active + " player=" + gm.Player.transform.position.ToString("F1")
                 + " cam.x=" + cam.transform.position.x.ToString("F1") + " exit=" + (exit != null && exit.activeSelf ? exit.transform.position.x.ToString("F1") : "off")
+                + " recall=" + gm.Player.HasRecall
                 + " types=" + string.Join(",", Enemy.All.Select(e => e.name.Replace("(Clone)", "")).GroupBy(n => n).Select(g => g.Key + "x" + g.Count())));
         }
 
@@ -77,7 +78,7 @@ public class StageAutoShot : MonoBehaviour
         {
             var map = CurrentMap();
             var problems = StageMaps.Validate(map);
-            Debug.Log("[Stages] map check " + label + " (" + map.name + "): " + (problems.Count == 0 ? "ok" : string.Join("; ", problems)));
+            Debug.Log("[Stages] map check " + label + " (" + map.name + ", " + map.Width + " wide): " + (problems.Count == 0 ? "ok" : string.Join("; ", problems)));
         }
 
         IEnumerator LeaveByExit(string shotName)
@@ -101,16 +102,19 @@ public class StageAutoShot : MonoBehaviour
 
         // Stage 1
         yield return new WaitForSecondsRealtime(1.0f);
-        foreach (var m in StageMaps.Stage1.Concat(StageMaps.Stage2))
-            Debug.Log("[Stages] design check " + m.name + ": " + (StageMaps.Validate(m).Count == 0 ? "ok" : string.Join("; ", StageMaps.Validate(m))));
+        foreach (var m in new[] { StageMaps.Stage1, StageMaps.Stage2, StageMaps.RuneRoom })
+        {
+            var problems = StageMaps.Validate(m);
+            Debug.Log("[Stages] design check " + m.name + ": " + (problems.Count == 0 ? "ok" : string.Join("; ", problems)));
+        }
         CheckMap("stage 1");
         Report("stage 1 start");
         Shot("1_start");
         gm.Player.TakeDamage(30); // to see whether the rewards heal
         Report("after 30 damage");
-        GoTo(0f);
+        GoTo(-5f);
         yield return new WaitForSecondsRealtime(1.2f);
-        Report("stage 1 middle");
+        gm.Player.Heal(1f);
         Shot("1_mid");
         yield return LeaveByExit("reward_after_1");
 
@@ -124,40 +128,44 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.3f);
         Report("stage 2 enemies");
         Shot("2_start");
-        GoTo(2f);
-        yield return new WaitForSecondsRealtime(1.2f);
+        GoTo(-30f);
+        yield return new WaitForSecondsRealtime(1.0f);
+        gm.Player.Heal(1f);
         Shot("2_mid");
         yield return LeaveByExit("reward_after_2");
 
-        // Boss stage
+        // Rune room: the exit stays closed until the rune is taken
+        yield return new WaitForSecondsRealtime(0.4f);
+        gm.Player.Heal(1f);
+        CheckMap("rune room");
+        Report("rune room loaded (recall must be off)");
+        Shot("3_banner");
+        yield return new WaitForSecondsRealtime(1.8f);
+        Shot("3_start");
+        var exitGo = GameObject.Find("Exit");
+        GoTo(exitGo.transform.position.x - 0.2f);
+        yield return new WaitForSecondsRealtime(0.5f);
+        Report("rune room exit before the rune (must stay in stage 2, the rune room)");
+        var rune = FindFirstObjectByType<RuneItem>();
+        Debug.Log("[Stages] rune object: " + (rune != null ? rune.transform.position.ToString("F1") : "none"));
+        gm.Player.Teleport(new Vector2(rune.transform.position.x, rune.transform.position.y - 0.3f));
+        yield return new WaitForSecondsRealtime(0.4f);
+        Report("rune taken (recall must be on)");
+        Shot("3_rune");
+        GoTo(exitGo.transform.position.x - 0.2f);
+        yield return WaitFor(() => Field("stage") == 3, 3f);
+        Report("left the rune room (must be the boss stage)");
+
+        // Boss stage: killing the boss clears the game
         yield return WaitFor(() => FindObjectsByType<Boss>(FindObjectsSortMode.None).Length > 0, 10f);
         yield return new WaitForSecondsRealtime(0.5f);
         Report("boss stage");
-        Shot("3_boss");
+        Shot("4_boss");
         foreach (var boss in FindObjectsByType<Boss>(FindObjectsSortMode.None)) boss.TakeHit(100000);
-        yield return WaitFor(() => gm.State == GameManager.GameState.Reward, 10f);
+        yield return WaitFor(() => gm.State == GameManager.GameState.Won, 10f);
         yield return new WaitForSecondsRealtime(0.3f);
-        Report("boss dead");
-        Shot("reward_after_boss");
-        Invoke("ChooseReward", 0);
-
-        // Back to stage 1 as round 2
-        yield return WaitFor(() => Field("stage") == 0 && Enemy.All.Count > 0, 10f);
-        yield return new WaitForSecondsRealtime(0.3f);
-        Report("round 2");
-        Shot("1_round2");
-
-        // chase test: the player waits at the start of the (stairs-and-pillars) map, ground monsters have to climb to reach it
-        gm.Player.Heal(1f);
-        string Grunts() => string.Join(" ", Enemy.All.Where(e => e != null && e.name.StartsWith("Grunt") || e != null && e.name.StartsWith("Elite")).Select(e => e.name.Substring(0, 2) + e.transform.position.x.ToString("F1") + "/" + e.transform.position.y.ToString("F1")));
-        Debug.Log("[Stages] chase start: " + Grunts());
-        for (int i = 0; i < 4; i++)
-        {
-            yield return new WaitForSecondsRealtime(2.5f);
-            gm.Player.Heal(1f);
-            Debug.Log("[Stages] chase +" + ((i + 1) * 2.5f) + "s: " + Grunts());
-            Shot("chase_" + i);
-        }
+        Report("boss dead (must be Won)");
+        Shot("5_clear");
 
         Debug.Log("[Stages] shots done");
         Destroy(rt);

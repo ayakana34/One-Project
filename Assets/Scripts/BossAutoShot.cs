@@ -65,7 +65,7 @@ public class BossAutoShot : MonoBehaviour
         // wait for stage 1 to spawn, then jump to the boss stage and spawn the boss in the same frame
         // (a boss stage without any enemy would open the reward screen at once)
         yield return new WaitForSecondsRealtime(2.5f);
-        Call("BeginStage", 2, false);
+        Call("BeginStage", 3, false);
         Call("SpawnBoss");
         yield return null;
         gm.Player.Teleport(new Vector2(-4f, -5.45f));
