@@ -94,11 +94,9 @@ public static class StageMaps
         },
         enemies = new[]
         {
-                G(-27f), G(-23f), G(-19.5f), G(-8f),
-                G(2f), G(6f), G(23f), G(27f),
-                E(-10.5f), E(4f), E(18f), F(-15f, 3f),
-                F(-5f, 3.5f), F(4f, 3.5f), F(13f, 3f), F(22f, 2.5f),
-                F(29f, 3f), S(-24f), S(18f)
+                G(-27f), G(-19.5f), G(-8f), G(6f),
+                G(23f), E(-10.5f), E(18f), F(-15f, 3f),
+                F(4f, 3.5f), F(22f, 2.5f), S(-24f), S(18f)
         }
     };
 
@@ -123,12 +121,10 @@ public static class StageMaps
         },
         enemies = new[]
         {
-                G(35f), G(-33.5f), G(-29f), G(-18f),
-                G(-10f), G(4f), G(8f), G(19f),
-                G(40f), E(-14f), E(-3f), E(12f),
-                E(27f), F(-36f, 3f), F(-24f, 3.5f), F(-12f, 3f),
-                F(0f, 3.5f), F(12f, 2.5f), F(24f, 3f), F(34f, 3.5f),
-                S(-30f), S(-12f), S(22f), S(32f)
+                G(35f), G(-29f), G(-18f), G(4f),
+                G(19f), G(40f), E(-14f), E(12f),
+                E(27f), F(-36f, 3f), F(-12f, 3f), F(12f, 2.5f),
+                F(34f, 3.5f), S(-12f), S(22f)
         }
     };
 

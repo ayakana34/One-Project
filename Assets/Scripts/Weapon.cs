@@ -26,12 +26,15 @@ public class Weapon : MonoBehaviour
     const float RestSpeed = 2f;
     const int MaxBounces = 6;
     const float PickupDistance = 0.8f;
+    const float BounceHitMinSpeed = 3f;   // a weapon that is only sliding or rolling to a stop does not hurt
+    const float BounceHitCooldown = 0.4f; // per monster, so one bounce cannot hit the same monster every frame
 
     Player owner;
     Vector2 dir, velocity;
     Phase phase = Phase.Flying;
     float traveled;
     int bounces;
+    readonly System.Collections.Generic.Dictionary<Enemy, float> lastHit = new();
 
     public static Weapon Spawn(Player owner, Vector2 pos, Vector2 dir)
     {
@@ -114,7 +117,8 @@ public class Weapon : MonoBehaviour
 
             transform.position = hit.centroid;
             var enemy = hit.collider.GetComponentInParent<Enemy>();
-            if (enemy != null) enemy.TakeHit(owner.WeaponDamage);
+            if (enemy != null) HurtEnemy(enemy);
+            else HitFx.Sparks(hit.point, hit.normal, new Color(0.9f, 0.9f, 0.95f), 4, 4f);
 
             phase = Phase.Bouncing;
             velocity = dir * Speed;
@@ -148,7 +152,12 @@ public class Weapon : MonoBehaviour
         {
             if (hit.collider.isTrigger) continue;
             if (hit.collider.GetComponentInParent<Player>() != null) continue;
-            if (hit.collider.GetComponentInParent<Enemy>() != null) continue;
+            var enemy = hit.collider.GetComponentInParent<Enemy>();
+            if (enemy != null)
+            {
+                if (speed >= BounceHitMinSpeed) HurtEnemy(enemy);
+                continue;
+            }
 
             bool platform = hit.collider.GetComponent<PlatformEffector2D>() != null;
             if (platform && (velocity.y > 0f || hit.normal.y < 0.5f)) continue;
@@ -159,6 +168,14 @@ public class Weapon : MonoBehaviour
         }
 
         transform.position += (Vector3)(moveDir * dist);
+    }
+
+    void HurtEnemy(Enemy enemy)
+    {
+        if (enemy == null) return;
+        if (lastHit.TryGetValue(enemy, out float t) && Time.time - t < BounceHitCooldown) return;
+        lastHit[enemy] = Time.time;
+        enemy.TakeHit(owner.WeaponDamage);
     }
 
     void Randomize(Vector2 normal)

@@ -37,10 +37,25 @@ public class CameraFollow : MonoBehaviour
         return Mathf.Clamp(x, lo, hi);
     }
 
+    float shakeAmp, shakeUntil, shakeLen = 1f;
+    Vector3 shakeOffset;
+
+    // A new shake only replaces the current one when it is stronger, so many small hits do not cancel a big one.
+    public void Shake(float amplitude, float duration)
+    {
+        if (amplitude < shakeAmp * Mathf.Clamp01((shakeUntil - Time.unscaledTime) / shakeLen)) return;
+        shakeAmp = amplitude;
+        shakeLen = Mathf.Max(0.01f, duration);
+        shakeUntil = Time.unscaledTime + duration;
+    }
+
     void LateUpdate()
     {
-        var p = transform.position;
+        var p = transform.position - shakeOffset;
         p.x = Mathf.Lerp(p.x, TargetX(), 1f - Mathf.Exp(-smoothing * Time.unscaledDeltaTime));
-        transform.position = p;
+
+        float left = Mathf.Clamp01((shakeUntil - Time.unscaledTime) / shakeLen);
+        shakeOffset = left > 0f ? (Vector3)(Random.insideUnitCircle * shakeAmp * left) : Vector3.zero;
+        transform.position = p + shakeOffset;
     }
 }

@@ -304,6 +304,8 @@ public class Player : MonoBehaviour
         if (Invulnerable) return;
         Hp = Mathf.Max(0, Hp - stats.Reduce(damage));
         hitInvulnUntil = Time.time + HitInvulnTime;
+        HitFx.Burst(Col.bounds.center, new Color(0.9f, 0.2f, 0.2f), 8);
+        HitFx.Shake(0.2f, 0.25f);
         if (Dead) GameManager.Instance.OnPlayerDead();
     }
 }

@@ -179,6 +179,18 @@ public class Enemy : MonoBehaviour
     {
         hp -= stats.Reduce(damage);
         flashUntil = Time.time + 0.1f;
-        if (hp <= 0) Destroy(gameObject);
+
+        var center = (Vector2)Col.bounds.center;
+        if (hp <= 0)
+        {
+            HitFx.Burst(center, new Color(1f, 0.55f, 0.3f), 16);
+            HitFx.Shake(0.18f, 0.2f);
+            Destroy(gameObject);
+        }
+        else
+        {
+            HitFx.Sparks(center, Vector2.up, new Color(1f, 0.95f, 0.6f), 6);
+            HitFx.Shake(0.07f, 0.1f);
+        }
     }
 }
