@@ -64,6 +64,7 @@ public class GameManager : MonoBehaviour
     readonly List<RewardType> types = new();
     readonly List<Card> choices = new();
     GameObject[] platforms;
+    GameObject[] terrain;
     GUIStyle labelStyle, bigStyle, centerStyle, cardStyle;
     int stage = StageGround, pendingStage, lastHeal;
     float spawnAt = -1f;
@@ -278,7 +279,12 @@ public class GameManager : MonoBehaviour
         }
 
         // Every map has its own fixed set of monsters.
-        foreach (var e in currentMap.enemies) SpawnEnemy(PrefabFor(e.kind), new Vector3(e.x, e.y, 0f));
+        foreach (var e in currentMap.enemies)
+        {
+            float y = e.y;
+            if (e.onGround) y += float.IsNaN(e.top) ? currentMap.SurfaceTop(e.x) : e.top;
+            SpawnEnemy(PrefabFor(e.kind), new Vector3(e.x, y, 0f));
+        }
     }
 
     GameObject PrefabFor(EnemyKind kind) => kind switch
@@ -335,6 +341,18 @@ public class GameManager : MonoBehaviour
             bgT = level.transform.Find("Background");
             ceilingT = level.transform.Find("Ceiling");
             floorT = level.transform.Find("Floor");
+
+            // Solid terrain blocks (steps, hills, pillars) are copies of the floor.
+            if (floorT != null)
+            {
+                terrain = new GameObject[StageMaps.MaxBlocks];
+                for (int i = 0; i < terrain.Length; i++)
+                {
+                    terrain[i] = Instantiate(floorT.gameObject, floorT.parent);
+                    terrain[i].name = "Terrain" + i;
+                    terrain[i].SetActive(false);
+                }
+            }
             leftT = level.transform.Find("LeftWall");
             rightT = level.transform.Find("RightWall");
         }
@@ -414,6 +432,20 @@ public class GameManager : MonoBehaviour
             var d = map.platforms[i];
             platforms[i].transform.position = new Vector3(d.x, d.y - 0.2f, 0f);
             platforms[i].transform.localScale = new Vector3(d.z, 0.4f, 1f);
+        }
+
+        if (terrain != null)
+        {
+            for (int i = 0; i < terrain.Length; i++)
+            {
+                bool used = i < map.blocks.Length;
+                terrain[i].SetActive(used);
+                if (!used) continue;
+                var d = map.blocks[i];
+                float height = d.y - FloorY;
+                terrain[i].transform.position = new Vector3(d.x, FloorY + height * 0.5f, 0f);
+                terrain[i].transform.localScale = new Vector3(d.z, height, 1f);
+            }
         }
 
         exitGo.SetActive(withExit);

@@ -142,7 +142,30 @@ public class Enemy : MonoBehaviour
             float dx = p.transform.position.x - transform.position.x;
             if (Mathf.Abs(dx) > 0.1f) dir = Mathf.Sign(dx);
         }
-        rb.linearVelocity = new Vector2(dir * speed, rb.linearVelocity.y);
+        var v = new Vector2(dir * speed, rb.linearVelocity.y);
+        if (dir != 0f && GravityScale > 0f && ShouldStepUp(dir)) v.y = StepJumpSpeed;
+        rb.linearVelocity = v;
+    }
+
+    // Walking monsters hop up the steps and pillars of the stage maps when something solid blocks the way.
+    const float StepJumpSpeed = 12f;
+    float nextStepAt;
+
+    bool ShouldStepUp(float dir)
+    {
+        if (Time.time < nextStepAt || Mathf.Abs(rb.linearVelocity.y) > 0.1f) return false;
+        var b = Col.bounds;
+        var origin = new Vector2(b.center.x + dir * (b.extents.x + 0.05f), b.min.y + 0.2f);
+        foreach (var hit in Physics2D.RaycastAll(origin, new Vector2(dir, 0f), 0.3f))
+        {
+            var c = hit.collider;
+            if (c == null || c.isTrigger || c == Col) continue;
+            if (c.GetComponentInParent<Enemy>() != null || c.GetComponent<Player>() != null) continue;
+            if (c.GetComponent<PlatformEffector2D>() != null) continue;
+            nextStepAt = Time.time + 0.5f;
+            return true;
+        }
+        return false;
     }
 
     public void ScaleStats(float hpMultiplier, float attackMultiplier)

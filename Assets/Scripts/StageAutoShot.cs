@@ -69,7 +69,16 @@ public class StageAutoShot : MonoBehaviour
                 + " types=" + string.Join(",", Enemy.All.Select(e => e.name.Replace("(Clone)", "")).GroupBy(n => n).Select(g => g.Key + "x" + g.Count())));
         }
 
-        void GoTo(float x) => gm.Player.Teleport(new Vector2(x, -5.45f));
+        StageMapDef CurrentMap() => (StageMapDef)typeof(GameManager).GetField("currentMap", All).GetValue(gm);
+
+        void GoTo(float x) => gm.Player.Teleport(new Vector2(x, CurrentMap().SurfaceTop(x) + 0.55f));
+
+        void CheckMap(string label)
+        {
+            var map = CurrentMap();
+            var problems = StageMaps.Validate(map);
+            Debug.Log("[Stages] map check " + label + " (" + map.name + "): " + (problems.Count == 0 ? "ok" : string.Join("; ", problems)));
+        }
 
         IEnumerator LeaveByExit(string shotName)
         {
@@ -92,6 +101,9 @@ public class StageAutoShot : MonoBehaviour
 
         // Stage 1
         yield return new WaitForSecondsRealtime(1.0f);
+        foreach (var m in StageMaps.Stage1.Concat(StageMaps.Stage2))
+            Debug.Log("[Stages] design check " + m.name + ": " + (StageMaps.Validate(m).Count == 0 ? "ok" : string.Join("; ", StageMaps.Validate(m))));
+        CheckMap("stage 1");
         Report("stage 1 start");
         Shot("1_start");
         gm.Player.TakeDamage(30); // to see whether the rewards heal
@@ -104,6 +116,8 @@ public class StageAutoShot : MonoBehaviour
 
         // Stage 2
         yield return new WaitForSecondsRealtime(0.4f);
+        gm.Player.Heal(1f);
+        CheckMap("stage 2");
         Report("stage 2 loaded");
         Shot("2_banner");
         yield return WaitFor(() => Enemy.All.Count > 0, 10f);
@@ -132,6 +146,18 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(0.3f);
         Report("round 2");
         Shot("1_round2");
+
+        // chase test: the player waits at the start of the (stairs-and-pillars) map, ground monsters have to climb to reach it
+        gm.Player.Heal(1f);
+        string Grunts() => string.Join(" ", Enemy.All.Where(e => e != null && e.name.StartsWith("Grunt") || e != null && e.name.StartsWith("Elite")).Select(e => e.name.Substring(0, 2) + e.transform.position.x.ToString("F1") + "/" + e.transform.position.y.ToString("F1")));
+        Debug.Log("[Stages] chase start: " + Grunts());
+        for (int i = 0; i < 4; i++)
+        {
+            yield return new WaitForSecondsRealtime(2.5f);
+            gm.Player.Heal(1f);
+            Debug.Log("[Stages] chase +" + ((i + 1) * 2.5f) + "s: " + Grunts());
+            Shot("chase_" + i);
+        }
 
         Debug.Log("[Stages] shots done");
         Destroy(rt);
