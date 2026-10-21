@@ -73,7 +73,7 @@ public static class StageMaps
     static EnemySpawn F(float x, float y) => Spawn(EnemyKind.Flyer, x, y);
     static EnemySpawn S(float x) => Spawn(EnemyKind.Shooter, x, ShooterHoverY);
 
-    // Stage 1: the outpost. An open yard, a guard hill with a lookout, a sky route over the open ground and a tower.
+    // Stage 1: the outpost. A gate ledge, a long gentle slope to a plateau with a lookout, a sky route over the open ground and an offset watchtower.
     public static readonly StageMapDef Stage1 = new StageMapDef
     {
         name = "Stage 1", minX = -36f, maxX = 36f, playerStartX = -33f,
@@ -82,25 +82,23 @@ public static class StageMaps
         stripeColor = new Color(0.22f, 0.23f, 0.3f),
         blocks = new[]
         {
-                B(-17f, -5f, 2f), B(-15f, -4f, 2f), B(-13f, -3f, 2f), B(-9f, -2f, 6f),
-                B(-5f, -3f, 2f), B(-3f, -4f, 2f), B(-1f, -5f, 2f), B(11f, -5f, 2f),
-                B(13f, -4f, 2f), B(15f, -3f, 2f), B(18f, -2f, 4f), B(21f, -3f, 2f),
-                B(23f, -4f, 2f), B(25f, -5f, 2f)
+                B(-26f, -3.8f, 4f), B(-20.5f, -5.4f, 3f), B(-17.5f, -4.8f, 3f), B(-14.5f, -4.2f, 3f),
+                B(-11.5f, -3.6f, 3f), B(-8.5f, -3f, 3f), B(-5.5f, -2.4f, 3f), B(0f, -2.4f, 8f),
+                B(5f, -4.2f, 2f), B(20f, -3.8f, 10f), B(19f, -1.6f, 6f), B(18f, 0.6f, 3f)
         },
         platforms = new[]
         {
-                P(-9f, 0.4f, 4f), P(2f, -3.6f, 3f), P(5.5f, -1.2f, 3f), P(9f, 1.2f, 3f),
-                P(18f, 0.4f, 4f)
+                P(0f, 0f, 5f), P(8.5f, -3.6f, 3f), P(11.5f, -1.2f, 3f), P(18f, 3f, 4f)
         },
         enemies = new[]
         {
-                G(-27f), G(-19.5f), G(-8f), G(6f),
-                G(23f), E(-10.5f), E(18f), F(-15f, 3f),
-                F(4f, 3.5f), F(22f, 2.5f), S(-24f), S(18f)
+                G(-23f), G(-17.5f), G(-2f), G(10.5f),
+                G(27f), E(-8.5f), E(21f), F(-14f, 3f),
+                F(3f, 3.5f), F(26f, 2.5f), S(-5f), S(18f)
         }
     };
 
-    // Stage 2: the citadel. An open gate yard, a long rampart walkway reached by stairs, a courtyard with a bridge and the keep.
+    // Stage 2: the citadel. A rampart with platform lanes, a moat with stepping stones, the keep (low wall, raised hall, tall tower) and a stepped way down.
     public static readonly StageMapDef Stage2 = new StageMapDef
     {
         name = "Stage 2", minX = -46f, maxX = 46f, playerStartX = -43f,
@@ -109,22 +107,21 @@ public static class StageMaps
         stripeColor = new Color(0.27f, 0.21f, 0.28f),
         blocks = new[]
         {
-                B(-31f, -5f, 2f), B(-29f, -4f, 2f), B(-27f, -3f, 2f), B(-25f, -2f, 2f),
-                B(-23f, -1f, 2f), B(-14f, -1f, 16f), B(-5f, -2f, 2f), B(-3f, -3f, 2f),
-                B(-1f, -4f, 2f), B(1f, -5f, 2f), B(15f, -5f, 2f), B(17f, -4f, 2f),
-                B(19f, -3f, 2f), B(21f, -2f, 2f), B(23f, -1f, 2f), B(27f, -1f, 6f),
-                B(31f, -2f, 2f), B(33f, -3f, 2f), B(35f, -4f, 2f), B(37f, -5f, 2f)
+                B(-30.75f, -4.4f, 2.5f), B(-28.25f, -3f, 2.5f), B(-25.75f, -1.6f, 2.5f), B(-17f, -1.6f, 15f),
+                B(-7.5f, -3.8f, 4f), B(16f, -3.8f, 8f), B(24f, -1.6f, 10f), B(31f, 0.6f, 4f),
+                B(34.5f, -1.6f, 3f), B(37.5f, -3.8f, 3f)
         },
         platforms = new[]
         {
-                P(-14f, 1.4f, 6f), P(8f, -1.6f, 3f), P(12.5f, -3.6f, 3f), P(27f, 1.4f, 4f)
+                P(-21f, 0.8f, 5f), P(-13f, 1.4f, 5f), P(-2f, -3.6f, 3f), P(2f, -1.2f, 3f),
+                P(6f, 1.2f, 3f), P(24f, 1.4f, 5f), P(41f, -3.6f, 3f)
         },
         enemies = new[]
         {
-                G(35f), G(-29f), G(-18f), G(4f),
-                G(19f), G(40f), E(-14f), E(12f),
-                E(27f), F(-36f, 3f), F(-12f, 3f), F(12f, 2.5f),
-                F(34f, 3.5f), S(-12f), S(22f)
+                G(-36f), G(-18f), G(-2f), G(8f),
+                G(15f), G(41f), E(-12.5f), E(24f),
+                E(34.5f), F(-38f, 3f), F(-5f, 3.5f), F(14f, 3f),
+                F(30f, 3.5f), S(-22f), S(22f)
         }
     };
 

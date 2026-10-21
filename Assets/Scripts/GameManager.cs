@@ -4,7 +4,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 
-public class GameManager : MonoBehaviour
+public partial class GameManager : MonoBehaviour
 {
     public enum GameState { Title, Playing, Reward, Lost, Paused, Won }
 
@@ -69,9 +69,8 @@ public class GameManager : MonoBehaviour
     float runeMessageUntil, runStartRealtime, clearSeconds;
     SpriteRenderer bgRenderer, floorRenderer;
     readonly List<SpriteRenderer> terrainRenderers = new();
-    GUIStyle labelStyle, bigStyle, centerStyle, cardStyle;
     int stage = StageGround, pendingStage, lastHeal;
-    float spawnAt = -1f;
+    float bannerUntil = -1f; // the stage banner is shown until then; the monsters are already on the field
     StageMapDef currentMap = StageMaps.Stage1;
     Transform bgT, ceilingT, floorT, leftT, rightT;
     GameObject exitGo;
@@ -81,7 +80,6 @@ public class GameManager : MonoBehaviour
     readonly List<Transform> stripes = new();
     GameState stateBeforePause;
     float timeScaleBeforePause = 1f;
-    GUIStyle controlsStyle;
 
     static bool skipTitleOnLoad;
     static Font uiFont;
@@ -185,16 +183,6 @@ public class GameManager : MonoBehaviour
         if (State != GameState.Playing) return;
 
         UpdateExitDoor();
-
-        if (spawnAt >= 0f)
-        {
-            if (Time.time >= spawnAt)
-            {
-                spawnAt = -1f;
-                SpawnStage(pendingStage);
-            }
-            return;
-        }
 
         // Stages 1 to 3 are left through the exit door; the game is cleared when the boss is dead.
         if (stage == StageBoss && Enemy.All.Count == 0) OnBossDefeated();
@@ -411,7 +399,8 @@ public class GameManager : MonoBehaviour
         int next = NextStage();
         if (next < 0) return;
         BeginStage(next, false);
-        spawnAt = Time.time + 1.5f;
+        SpawnStage(next);
+        bannerUntil = Time.time + 1.5f;
     }
 
     void ClearField()
@@ -495,7 +484,7 @@ public class GameManager : MonoBehaviour
 
     // Stages 1 and 2 are left through the exit, which opens once every monster of the stage is dead;
     // the rune room's exit is always open (taking the recall rune there is optional).
-    bool ExitOpen => spawnAt < 0f && (stage == StageRune || (stage != StageBoss && Enemy.All.Count == 0));
+    bool ExitOpen => (stage == StageRune || (stage != StageBoss && Enemy.All.Count == 0));
 
     void UpdateExitDoor()
     {
@@ -514,25 +503,6 @@ public class GameManager : MonoBehaviour
         {
             lastHeal = 0;
             GoToNextStage();
-        }
-    }
-
-    void DrawExitHint()
-    {
-        var cam = Camera.main;
-        if (cam == null || exitGo == null || !exitGo.activeSelf) return;
-        bool open = ExitOpen;
-        var screen = cam.WorldToScreenPoint(exitGo.transform.position + Vector3.up * 1.7f);
-        if (screen.x >= 0f && screen.x <= Screen.width)
-        {
-            string label = open ? "출구" : "잠김 · 남은 적 " + Enemy.All.Count;
-            GUI.Label(new Rect(screen.x - 100f, Screen.height - screen.y - 14f, 200f, 28f), label, centerStyle);
-        }
-        else
-        {
-            int meters = Mathf.Max(0, Mathf.RoundToInt(exitGo.transform.position.x - Player.transform.position.x));
-            string label = open ? "출구 >> " + meters + "m" : "출구 잠김 · 남은 적 " + Enemy.All.Count;
-            GUI.Label(new Rect(Screen.width - 260f, Screen.height * 0.4f, 250f, 28f), label, labelStyle);
         }
     }
 
@@ -591,166 +561,4 @@ public class GameManager : MonoBehaviour
 #endif
     }
 
-    void DrawMenu(bool title)
-    {
-        cardStyle ??= new GUIStyle(GUI.skin.button) { font = UiFont, fontSize =20, wordWrap = true, alignment = TextAnchor.MiddleCenter };
-        controlsStyle ??= new GUIStyle(GUI.skin.label) { font = UiFont, fontSize =18, alignment = TextAnchor.UpperLeft, normal = { textColor = Color.white } };
-
-        GUI.color = new Color(0f, 0f, 0f, title ? 0.85f : 0.7f);
-        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(0, Screen.height * 0.08f, Screen.width, 90), title ? "ONE WEAPON" : "일시정지", bigStyle);
-
-        string[] labels = title ? new[] { "시작  (Enter)", "종료" } : new[] { "계속하기  (Esc)", "다시 시작", "종료" };
-        Action[] actions = title ? new Action[] { StartGame, QuitGame } : new Action[] { Resume, RestartGame, QuitGame };
-        const float bw = 280f, bh = 48f, gap = 14f;
-        float x = (Screen.width - bw) * 0.5f;
-        float y = Screen.height * 0.25f;
-        for (int i = 0; i < labels.Length; i++)
-        {
-            if (!GUI.Button(new Rect(x, y + i * (bh + gap), bw, bh), labels[i], cardStyle)) continue;
-
-            actions[i]();
-            return;
-        }
-
-        float cy = y + labels.Length * (bh + gap) + 24f;
-        GUI.Label(new Rect((Screen.width - 520f) * 0.5f, cy, 520f, 260f),
-            "조작 안내\n" +
-            "A / D : 좌우 이동\n" +
-            "Space : 점프   (S + Space : 발판 아래로 내려가기)\n" +
-            "마우스 : 조준\n" +
-            "마우스 좌클릭 : 무기 던지기\n" +
-            "Shift / 마우스 우클릭 : 마우스 방향으로 대쉬\n" +
-            "Q : 무기 회수 (회수의 룬을 얻은 뒤)\n" +
-            "R : 다시 시작      Esc : 메뉴",
-            controlsStyle);
-    }
-
-    void OnGUI()
-    {
-        if (Player == null) return;
-        labelStyle ??= new GUIStyle(GUI.skin.label) { font = UiFont, fontSize =18, normal = { textColor = Color.white } };
-        bigStyle ??= new GUIStyle(GUI.skin.label) { font = UiFont, fontSize =48, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-        centerStyle ??= new GUIStyle(GUI.skin.label) { font = UiFont, fontSize =18, alignment = TextAnchor.MiddleCenter, normal = { textColor = Color.white } };
-
-        if (State == GameState.Title)
-        {
-            DrawMenu(true);
-            return;
-        }
-
-        var hpBar = new Rect(16, 16, 300, 26);
-        GUI.color = new Color(0.15f, 0.15f, 0.17f);
-        GUI.DrawTexture(hpBar, Texture2D.whiteTexture);
-        GUI.color = new Color(0.85f, 0.2f, 0.25f);
-        GUI.DrawTexture(new Rect(hpBar.x, hpBar.y, hpBar.width * Mathf.Clamp01((float)Player.Hp / Player.MaxHp), hpBar.height), Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        GUI.Label(hpBar, Player.Hp + " / " + Player.MaxHp, centerStyle);
-
-        GUI.Label(new Rect(16, 52, 500, 28), "무기: " + (Player.HasWeapon ? "준비됨" : "주워야 함"), labelStyle);
-        GUI.Label(new Rect(16, 76, 80, 28), "대쉬:", labelStyle);
-        for (int i = 0; i < Player.MaxDashCharges; i++)
-        {
-            var slot = new Rect(80 + i * 30, 82, 24, 16);
-            GUI.color = new Color(0.2f, 0.2f, 0.24f);
-            GUI.DrawTexture(slot, Texture2D.whiteTexture);
-            float fill = i < Player.DashCharges ? 1f : i == Player.DashCharges ? Player.DashRechargeProgress : 0f;
-            GUI.color = new Color(0.4f, 0.8f, 1f);
-            GUI.DrawTexture(new Rect(slot.x, slot.y, slot.width * fill, slot.height), Texture2D.whiteTexture);
-        }
-        GUI.color = Color.white;
-        GUI.Label(new Rect(16, 100, 500, 28), "남은 적: " + Enemy.All.Count, labelStyle);
-        GUI.Label(new Rect(16, 124, 500, 28), StageName(stage), labelStyle);
-        GUI.Label(new Rect(16, 148, 500, 28), "공격력 " + Player.stats.attack + "   방어력 " + Player.stats.defense, labelStyle);
-        int nextLine = 172;
-        if (Player.HasRecall)
-        {
-            float left = Player.RecallCooldownLeft;
-            GUI.Label(new Rect(16, nextLine, 500, 28), "회수 [Q]: " + (left <= 0f ? "준비됨" : left.ToString("0.0") + "초"), labelStyle);
-            nextLine += 24;
-        }
-        GUI.Label(new Rect(16, nextLine, 500, 28), "R: 다시 시작   Esc: 메뉴", labelStyle);
-
-        var boss = Boss.Current;
-        if (boss != null)
-        {
-            float w = 500f;
-            float x = (Screen.width - w) * 0.5f;
-            GUI.color = new Color(0.15f, 0.15f, 0.15f);
-            GUI.DrawTexture(new Rect(x, 20, w, 22), Texture2D.whiteTexture);
-            GUI.color = new Color(0.85f, 0.2f, 0.2f);
-            GUI.DrawTexture(new Rect(x, 20, w * Mathf.Clamp01((float)boss.Hp / boss.MaxHp), 22), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUI.Label(new Rect(x, 44, w, 28), "보스", centerStyle);
-        }
-
-        if (State == GameState.Playing && spawnAt >= 0f)
-        {
-            string banner = StageName(pendingStage);
-            GUI.Label(new Rect(0, Screen.height * 0.25f, Screen.width, 80), banner, bigStyle);
-        }
-
-        if (State == GameState.Playing) DrawExitHint();
-        if (State == GameState.Reward) DrawRewards();
-        if (State == GameState.Paused) DrawMenu(false);
-
-        if (State == GameState.Lost)
-        {
-            GUI.Label(new Rect(0, 0, Screen.width, Screen.height), "게임 오버", bigStyle);
-            GUI.Label(new Rect(0, Screen.height * 0.5f + 40, Screen.width, 40), "도달한 곳: " + StageName(stage) + "   (R: 다시 시작)", centerStyle);
-        }
-
-        if (State == GameState.Won)
-        {
-            GUI.color = new Color(0f, 0f, 0f, 0.6f);
-            GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-            GUI.color = Color.white;
-            GUI.Label(new Rect(0, Screen.height * 0.3f, Screen.width, 90), "게임 클리어!", bigStyle);
-            int sec = Mathf.RoundToInt(clearSeconds);
-            GUI.Label(new Rect(0, Screen.height * 0.3f + 90, Screen.width, 40), "클리어 시간 " + sec / 60 + "분 " + sec % 60 + "초", centerStyle);
-            GUI.Label(new Rect(0, Screen.height * 0.3f + 130, Screen.width, 40), "R: 다시 시작   Esc: 메뉴", centerStyle);
-        }
-
-        if (runeMessageUntil > Time.unscaledTime && State != GameState.Lost)
-        {
-            GUI.Label(new Rect(0, Screen.height * 0.2f, Screen.width, 80), "회수의 룬 획득!", bigStyle);
-            GUI.Label(new Rect(0, Screen.height * 0.2f + 70, Screen.width, 30), "Q : 던진 무기를 손으로 불러옵니다 (쿨타임 4초)", centerStyle);
-        }
-    }
-
-    static string StageName(int s) => s switch
-    {
-        StageGround => "스테이지 1",
-        StageAir => "스테이지 2",
-        StageRune => "스테이지 3 · 회수의 룬",
-        _ => "최종 스테이지 · 보스"
-    };
-
-    void DrawRewards()
-    {
-        cardStyle ??= new GUIStyle(GUI.skin.button) { font = UiFont, fontSize =20, wordWrap = true, alignment = TextAnchor.MiddleCenter };
-
-        GUI.color = new Color(0f, 0f, 0f, 0.65f);
-        GUI.DrawTexture(new Rect(0, 0, Screen.width, Screen.height), Texture2D.whiteTexture);
-        GUI.color = Color.white;
-        GUI.Label(new Rect(0, Screen.height * 0.18f, Screen.width, 80), "보상을 선택하세요", bigStyle);
-        if (lastHeal > 0)
-            GUI.Label(new Rect(0, Screen.height * 0.18f + 70, Screen.width, 30), "체력 " + lastHeal + " 회복", centerStyle);
-
-        const float w = 260f, h = 170f, gap = 30f;
-        float total = choices.Count * w + (choices.Count - 1) * gap;
-        float x0 = (Screen.width - total) * 0.5f;
-        float y0 = Screen.height * 0.4f;
-        for (int i = 0; i < choices.Count; i++)
-        {
-            var card = choices[i];
-            var rect = new Rect(x0 + i * (w + gap), y0, w, h);
-            string text = "[" + (i + 1) + "]\n" + TierPrefix[card.tier] + card.type.name + " +" + card.Value + "\n" + card.type.describe(card.Value);
-
-            GUI.backgroundColor = TierColor[card.tier];
-            if (GUI.Button(rect, text, cardStyle)) ChooseReward(i);
-            GUI.backgroundColor = Color.white;
-        }
-    }
 }

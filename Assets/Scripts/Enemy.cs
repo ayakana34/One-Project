@@ -33,6 +33,10 @@ public class Enemy : MonoBehaviour
     protected virtual Sprite SpriteForState() => idleSprite;
     protected float facing = 1f;
 
+    // A monster that has just appeared cannot hurt by touch for a moment, so a stage change never costs health at once.
+    const float SpawnGrace = 0.75f;
+    float harmlessUntil;
+
     int hp;
     float flashUntil;
     Color baseColor;
@@ -55,6 +59,7 @@ public class Enemy : MonoBehaviour
 
         hp = stats.maxHp;
         baseColor = sr.color;
+        harmlessUntil = Time.time + SpawnGrace;
 
         if (idleSprite != null)
         {
@@ -131,7 +136,7 @@ public class Enemy : MonoBehaviour
         if (live && !aggroed && Vector2.Distance(p.transform.position, transform.position) <= AggroRange) aggroed = true;
         Move(live && aggroed ? p : null);
 
-        if (live && Col.Distance(p.Col).isOverlapped) p.TakeDamage(ContactDamage);
+        if (live && Time.time >= harmlessUntil && Col.Distance(p.Col).isOverlapped) p.TakeDamage(ContactDamage);
     }
 
     protected virtual void Move(Player p)

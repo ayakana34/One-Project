@@ -72,7 +72,7 @@ public class BossAutoShot : MonoBehaviour
 
         var boss0 = FindObjectsByType<Boss>(FindObjectsSortMode.None).FirstOrDefault();
         Debug.Log("[Boss] boss spawned: " + (boss0 != null) + " state=" + gm.State + " timeScale=" + Time.timeScale + " stage=" + typeof(GameManager).GetField("stage", All).GetValue(gm)
-            + " spawnAt=" + typeof(GameManager).GetField("spawnAt", All).GetValue(gm) + " time=" + Time.time + " dead=" + gm.Player.Dead
+            + " bannerUntil=" + typeof(GameManager).GetField("bannerUntil", All).GetValue(gm) + " time=" + Time.time + " dead=" + gm.Player.Dead
             + (boss0 != null ? " bossEnabled=" + boss0.enabled + " dist=" + Vector2.Distance(gm.Player.transform.position, boss0.transform.position) : ""));
         if (boss0 == null) { EditorApplication.isPlaying = false; yield break; }
         boss0.testSequence = new[] { Boss.Attack.Rock, Boss.Attack.Slam, Boss.Attack.Charge };

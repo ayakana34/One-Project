@@ -124,37 +124,38 @@ def stairs(x0, direction, n, w, first_top, rise):
 
 
 # ------------------------------------------------------------------ stage 1: the outpost (72 wide)
+# gate ledge -> long gentle slope up to a plateau -> short steep drop -> open ground with a sky route -> an offset watchtower
 s1 = Map("Stage 1", -36, 36, -33, theme((0.17, 0.18, 0.24), (0.36, 0.38, 0.46), (0.22, 0.23, 0.30)))
-s1.B(*stairs(-18, 1, 3, 2, -5.0, 1.0))                      # the guard hill: stairs up, plateau, stairs down
-s1.B((-9, -2.0, 6))
-s1.B(*stairs(-6, 1, 3, 2, -3.0, -1.0))
-s1.P((-9, 0.4, 4))                                          # a lookout above the plateau
-s1.P((2, -3.6, 3), (5.5, -1.2, 3), (9, 1.2, 3))             # the sky route over the open ground to the tower
-s1.B(*stairs(10, 1, 3, 2, -5.0, 1.0))                       # the tower
-s1.B((18, -2.0, 4))
-s1.B(*stairs(20, 1, 3, 2, -3.0, -1.0))
-s1.P((18, 0.4, 4))
-s1.G(-27).G(-19.5).G(-8).G(6).G(23)
-s1.E(-10.5).E(18)
-s1.F(-15, 3).F(4, 3.5).F(22, 2.5)
-s1.S(-24).S(18)
+s1.B((-26, -3.8, 4))                                        # the gate: a sheer ledge to climb right away
+s1.B(*stairs(-22, 1, 6, 3, -5.4, 0.6))                      # a long gentle slope up
+s1.B((0, -2.4, 8))                                          # the plateau
+s1.B((5, -4.2, 2))                                          # the short steep way down
+s1.P((0, 0.0, 5))                                           # a lookout above the plateau
+s1.P((8.5, -3.6, 3), (11.5, -1.2, 3))                       # the sky route over the open ground to the tower
+s1.B((20, -3.8, 10), (19, -1.6, 6), (18, 0.6, 3))           # the watchtower: a wide base, a ledge, a narrow summit (climbed from the right)
+s1.P((18, 3.0, 4))                                        # a perch over the summit
+s1.G(-23).G(-17.5).G(-2).G(10.5).G(27)
+s1.E(-8.5).E(21)
+s1.F(-14, 3).F(3, 3.5).F(26, 2.5)
+s1.S(-5).S(18)
 
 # ------------------------------------------------------------------ stage 2: the citadel (92 wide)
+# stairs up to a long rampart with two lanes of platforms -> two steep steps down -> a moat with stepping stones
+# -> the keep: a low wall, a raised hall and a tall tower -> a stepped way down -> the last yard
 s2 = Map("Stage 2", -46, 46, -43, theme((0.20, 0.16, 0.21), (0.44, 0.36, 0.44), (0.27, 0.21, 0.28)))
-s2.B(*stairs(-32, 1, 5, 2, -5.0, 1.0))                      # the rampart: stairs up, a long walkway, stairs down
-s2.B((-14, -1.0, 16))
-s2.B(*stairs(-6, 1, 4, 2, -2.0, -1.0))
-s2.P((-14, 1.4, 6))
-s2.P((8, -1.6, 3))
-s2.P((12.5, -3.6, 3))
-s2.B(*stairs(14, 1, 5, 2, -5.0, 1.0))                       # the keep
-s2.B((27, -1.0, 6))
-s2.B(*stairs(30, 1, 4, 2, -2.0, -1.0))
-s2.P((27, 1.4, 4))
-s2.G(35).G(-29).G(-18).G(4).G(19).G(40)
-s2.E(-14).E(12).E(27)
-s2.F(-36, 3).F(-12, 3).F(12, 2.5).F(34, 3.5)
-s2.S(-12).S(22)
+s2.B(*stairs(-32, 1, 3, 2.5, -4.4, 1.4))                    # the rampart stairs
+s2.B((-17, -1.6, 15))                                       # the long rampart walkway
+s2.B((-7.5, -3.8, 4))                                       # two steep steps down
+s2.P((-21, 0.8, 5), (-13, 1.4, 5))                          # platform lanes above the walkway
+s2.P((-2, -3.6, 3), (2, -1.2, 3), (6, 1.2, 3))              # stepping stones over the moat
+s2.B((16, -3.8, 8), (24, -1.6, 10), (31, 0.6, 4))           # the keep: low wall, raised hall, tall tower
+s2.P((24, 1.4, 5))                                          # a gallery above the hall
+s2.B((34.5, -1.6, 3), (37.5, -3.8, 3))                      # the stepped way down
+s2.P((41, -3.6, 3))
+s2.G(-36).G(-18).G(-2).G(8).G(15).G(41)
+s2.E(-12.5).E(24).E(34.5)
+s2.F(-38, 3).F(-5, 3.5).F(14, 3).F(30, 3.5)
+s2.S(-22).S(22)
 
 # ------------------------------------------------------------------ rune room: a short flat corridor, no monsters
 rr = Map("Rune", -10, 10, -7.5, theme((0.12, 0.19, 0.20), (0.32, 0.46, 0.46), (0.17, 0.26, 0.27)))
