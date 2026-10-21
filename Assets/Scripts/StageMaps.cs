@@ -73,7 +73,7 @@ public static class StageMaps
     static EnemySpawn F(float x, float y) => Spawn(EnemyKind.Flyer, x, y);
     static EnemySpawn S(float x) => Spawn(EnemyKind.Shooter, x, ShooterHoverY);
 
-    // Stage 1: the outskirts. A hill with a peak, rocks, a ruin of pillars, a stepped mesa and a platform archipelago.
+    // Stage 1: the outpost. An open yard, a guard hill with a lookout, a sky route over the open ground and a tower.
     public static readonly StageMapDef Stage1 = new StageMapDef
     {
         name = "Stage 1", minX = -36f, maxX = 36f, playerStartX = -33f,
@@ -82,10 +82,10 @@ public static class StageMaps
         stripeColor = new Color(0.22f, 0.23f, 0.3f),
         blocks = new[]
         {
-                B(-25f, -4.8f, 1.8f), B(-21f, -4.8f, 1.8f), B(-17f, -5f, 2f), B(-15f, -4f, 2f),
-                B(-13f, -3f, 2f), B(-9f, -2f, 6f), B(-5f, -3f, 2f), B(-3f, -4f, 2f),
-                B(-1f, -5f, 2f), B(11f, -5f, 2f), B(13f, -4f, 2f), B(15f, -3f, 2f),
-                B(18f, -2f, 4f), B(21f, -3f, 2f), B(23f, -4f, 2f), B(25f, -5f, 2f)
+                B(-17f, -5f, 2f), B(-15f, -4f, 2f), B(-13f, -3f, 2f), B(-9f, -2f, 6f),
+                B(-5f, -3f, 2f), B(-3f, -4f, 2f), B(-1f, -5f, 2f), B(11f, -5f, 2f),
+                B(13f, -4f, 2f), B(15f, -3f, 2f), B(18f, -2f, 4f), B(21f, -3f, 2f),
+                B(23f, -4f, 2f), B(25f, -5f, 2f)
         },
         platforms = new[]
         {
@@ -102,7 +102,7 @@ public static class StageMaps
         }
     };
 
-    // Stage 2: the ruined citadel. A big hill, a colonnade, a rampart with towers, floating gardens, the citadel and a descent.
+    // Stage 2: the citadel. An open gate yard, a long rampart walkway reached by stairs, a courtyard with a bridge and the keep.
     public static readonly StageMapDef Stage2 = new StageMapDef
     {
         name = "Stage 2", minX = -46f, maxX = 46f, playerStartX = -43f,
@@ -111,10 +111,9 @@ public static class StageMaps
         stripeColor = new Color(0.27f, 0.21f, 0.28f),
         blocks = new[]
         {
-                B(-38f, -4.8f, 1.8f), B(-35f, -4.8f, 1.8f), B(-31f, -5f, 2f), B(-29f, -4f, 2f),
-                B(-27f, -3f, 2f), B(-25f, -2f, 2f), B(-23f, -1f, 2f), B(-14f, -1f, 16f),
-                B(-5f, -2f, 2f), B(-3f, -3f, 2f), B(-1f, -4f, 2f), B(1f, -5f, 2f),
-                B(6f, -4.8f, 1.8f), B(10f, -4.8f, 1.8f), B(15f, -5f, 2f), B(17f, -4f, 2f),
+                B(-31f, -5f, 2f), B(-29f, -4f, 2f), B(-27f, -3f, 2f), B(-25f, -2f, 2f),
+                B(-23f, -1f, 2f), B(-14f, -1f, 16f), B(-5f, -2f, 2f), B(-3f, -3f, 2f),
+                B(-1f, -4f, 2f), B(1f, -5f, 2f), B(15f, -5f, 2f), B(17f, -4f, 2f),
                 B(19f, -3f, 2f), B(21f, -2f, 2f), B(23f, -1f, 2f), B(27f, -1f, 6f),
                 B(31f, -2f, 2f), B(33f, -3f, 2f), B(35f, -4f, 2f), B(37f, -5f, 2f)
         },
@@ -133,27 +132,17 @@ public static class StageMaps
         }
     };
 
-    // Stage 3: the rune room. Climb the stepped mound to the recall rune, then leave through the exit.
+    // Stage 3: the rune room. A short flat corridor without monsters: take the recall rune, then leave through the exit.
     public static readonly StageMapDef RuneRoom = new StageMapDef
     {
-        name = "Rune", minX = -30f, maxX = 30f, playerStartX = -27f,
+        name = "Rune", minX = -10f, maxX = 10f, playerStartX = -7.5f,
         backgroundColor = new Color(0.12f, 0.19f, 0.2f),
         groundColor = new Color(0.32f, 0.46f, 0.46f),
         stripeColor = new Color(0.17f, 0.26f, 0.27f),
-        runePos = new Vector2(12f, -0.6f),
-        blocks = new[]
-        {
-                B(12f, -4.8f, 14f), B(12f, -3.4f, 10.8f), B(12f, -2f, 7.6f), B(12f, -0.6f, 4.4f)
-        },
-        platforms = new[]
-        {
-                P(-17f, -3.6f, 3.5f), P(-8f, -3.6f, 3f), P(3f, -3.6f, 3f)
-        },
-        enemies = new[]
-        {
-                G(-17f), G(-9f), G(2.5f), E(6f),
-                F(-12f, 3f), F(4f, 3.5f), S(-5f), S(16f)
-        }
+        runePos = new Vector2(1.5f, -6f),
+        blocks = new Vector3[0],
+        platforms = new Vector3[0],
+        enemies = new EnemySpawn[0]
     };
 
     // The boss arena: a single screen.
