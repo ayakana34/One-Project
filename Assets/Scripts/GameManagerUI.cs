@@ -17,6 +17,7 @@ public partial class GameManager
 
     GUIStyle uiText, buttonStyle, buttonPrimaryStyle;
     Matrix4x4 uiMatrix = Matrix4x4.identity;
+    float wonShownAt = -1f;
     float uiWidth, hpTrail = -1f;
     float lastTrailTime;
 
@@ -128,6 +129,7 @@ public partial class GameManager
                 DrawEnrageBanner();
             }
             if (State == GameState.Intro) DrawBossIntro();
+            DrawBossDeath();
             if (State == GameState.Tutorial) DrawRuneTutorial();
             if (State == GameState.Reward) DrawRewards();
             if (State == GameState.Paused) DrawMenu(false);
@@ -351,6 +353,18 @@ public partial class GameManager
         if (UiButton(new Rect(cx - 130f, panel.yMax - 76f, 260f, 50f), "확인  (Enter)", true)) CloseRuneTutorial();
     }
 
+    // The boss's death sequence: letterbox bars and white flashes at the killing blow and the final burst.
+    void DrawBossDeath()
+    {
+        var boss = Boss.Current;
+        if (boss == null || !boss.Dying) return;
+        float bar = Mathf.Clamp01(boss.DeathAge / 0.4f) * 56f;
+        Fill(new Rect(0f, 0f, uiWidth, bar), Color.black);
+        Fill(new Rect(0f, UiHeight - bar, uiWidth, bar), Color.black);
+        float flash = boss.DeathFlash;
+        if (flash > 0f) Fill(new Rect(0f, 0f, uiWidth, UiHeight), new Color(1f, 1f, 1f, flash));
+    }
+
     // The boss cutscene: letterbox bars and, once the golem has burst out of the boulder, its portrait and name.
     void DrawBossIntro()
     {
@@ -494,7 +508,11 @@ public partial class GameManager
 
     void DrawGameClear()
     {
-        Fill(new Rect(0f, 0f, uiWidth, UiHeight), new Color(Ink.r, Ink.g, Ink.b, 0.78f));
+        // fades in, so the end of the boss fight does not cut hard to a menu
+        if (wonShownAt < 0f) wonShownAt = Time.realtimeSinceStartup;
+        float fade = Mathf.Clamp01((Time.realtimeSinceStartup - wonShownAt) / 0.9f);
+        Fill(new Rect(0f, 0f, uiWidth, UiHeight), new Color(Ink.r, Ink.g, Ink.b, 0.78f * fade));
+        if (fade < 0.6f) return; // the card appears halfway through the fade
         float cx = uiWidth * 0.5f;
         var panel = new Rect(cx - 280f, UiHeight * 0.2f, 560f, 330f);
         Panel(panel, 0.85f);

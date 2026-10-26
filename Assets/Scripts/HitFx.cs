@@ -29,12 +29,15 @@ public static class HitFx
         if (follow != null) follow.Shake(amplitude, duration);
     }
 
-    static void Spawn(Vector2 pos, Vector2 velocity, Color color, float size, float life)
+    // A dot that stays where it is and fades out: the trail of a flying weapon.
+    public static void Dot(Vector2 pos, Color color, float size = 0.3f, float life = 0.3f) => Spawn(pos, Vector2.zero, color, size, life, 0f);
+
+    static void Spawn(Vector2 pos, Vector2 velocity, Color color, float size, float life, float gravity = 18f)
     {
         var sr = HazardArt.Make("Fx", HazardArt.Square, color, 50);
         sr.transform.position = pos;
         sr.transform.localScale = Vector3.one * size;
-        sr.gameObject.AddComponent<FxParticle>().Init(velocity, life);
+        sr.gameObject.AddComponent<FxParticle>().Init(velocity, life, gravity);
     }
 }
 
@@ -45,11 +48,13 @@ public class FxParticle : MonoBehaviour
     SpriteRenderer sr;
     Color color;
     Vector3 scale;
+    float gravity = 18f;
 
-    public void Init(Vector2 v, float lifetime)
+    public void Init(Vector2 v, float lifetime, float gravityPull = 18f)
     {
         velocity = v;
         life = lifetime;
+        gravity = gravityPull;
         sr = GetComponent<SpriteRenderer>();
         color = sr.color;
         scale = transform.localScale;
@@ -60,7 +65,7 @@ public class FxParticle : MonoBehaviour
         age += Time.deltaTime;
         if (age >= life) { Destroy(gameObject); return; }
 
-        velocity.y -= 18f * Time.deltaTime;
+        velocity.y -= gravity * Time.deltaTime;
         transform.position += (Vector3)(velocity * Time.deltaTime);
 
         float t = age / life;

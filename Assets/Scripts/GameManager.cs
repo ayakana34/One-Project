@@ -198,7 +198,7 @@ public partial class GameManager : MonoBehaviour
         {
             // the boss cutscene: the fight starts when the boss says so; Enter or Space skips it
             var boss = Boss.Current;
-            if (boss == null || !boss.IntroActive) State = GameState.Playing;
+            if (boss == null || !boss.CutsceneActive) State = GameState.Playing;
             else if (kb != null && boss.IntroTime > 0.6f && (kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame)) boss.SkipIntro();
             return;
         }
@@ -435,6 +435,7 @@ public partial class GameManager : MonoBehaviour
         if (!StageReady(s)) return;
         Time.timeScale = 1f;
         State = GameState.Playing;
+        wonShownAt = -1f;
         bannerUntil = -1f;
         Player.Heal(1f);
         if (s == StageAir || s == StageBoss) Player.GrantRecall(); // the rune cave comes before them
@@ -587,6 +588,12 @@ public partial class GameManager : MonoBehaviour
         State = GameState.Tutorial;
         Time.timeScale = 0f;
         tutorialOpenedAt = Time.unscaledTime;
+    }
+
+    // The boss's death sequence takes the screen over like the intro does: nothing else moves until it is over.
+    public void BeginBossFinale()
+    {
+        if (State == GameState.Playing) State = GameState.Intro;
     }
 
     void CloseRuneTutorial()

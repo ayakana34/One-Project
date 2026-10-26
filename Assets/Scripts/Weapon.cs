@@ -52,10 +52,13 @@ public class Weapon : MonoBehaviour
         if (Current == this) Current = null;
     }
 
+    static readonly Color RecallColor = new Color(0.5f, 0.95f, 1f);
+
     public void Recall()
     {
         phase = Phase.Recalling;
         recallHit.Clear();
+        HitFx.Burst(transform.position, RecallColor, 12); // it lights up where it lies
     }
 
     void RecallMove()
@@ -73,8 +76,18 @@ public class Weapon : MonoBehaviour
             if (enemy != null && recallHit.Add(enemy)) enemy.TakeHit(owner.WeaponDamage);
         }
 
+        // a bright trail along the way back
+        Vector2 from = transform.position;
+        Vector2 dirBack = to.normalized;
+        for (int i = 0; i < 5; i++)
+        {
+            var c = Color.Lerp(RecallColor, Color.white, i / 4f);
+            HitFx.Dot(from + dirBack * (step * i / 5f), c, 0.32f - i * 0.02f, 0.32f);
+        }
+
         if (to.magnitude <= step + PickupDistance)
         {
+            HitFx.Burst(owner.transform.position, RecallColor, 10); // a flash as it lands in the hand
             owner.PickUp();
             Destroy(gameObject);
             return;

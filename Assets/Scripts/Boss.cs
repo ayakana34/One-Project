@@ -7,7 +7,8 @@ using UnityEngine;
 // Below half health the boss is enraged: it chases and acts faster, charges twice in a row, and after the landing
 // of a slam it hammers the ground with both hands for a second set of shockwaves.
 // On arrival the boss is a boulder that cracks open into the golem (the intro); the first time its health drops to
-// half it stops, cannot be hurt, and roars itself into the enraged state (the enrage transition).
+// half it stops, cannot be hurt, and roars itself into the enraged state (the enrage transition). When it dies it
+// crumbles in slow motion and bursts apart (the death sequence) before the game is cleared.
 public class Boss : Enemy
 {
     public enum Attack { Charge, Slam }
@@ -21,6 +22,8 @@ public class Boss : Enemy
     const float IntroRumble = 1.8f;       // the boulder shakes
     const float IntroCardIn = 2.1f;       // the name card appears
     const float IntroEnd = 4.8f;          // the fight starts
+    const float DeathCrumble = 1.7f;      // slow motion crumbling (real seconds)
+    const float DeathEnd = 2.2f;          // the final burst, then the boss is gone
     const float JumpSpeed = 13f;
     const float MaxJumpVx = 11f;
 
@@ -48,6 +51,11 @@ public class Boss : Enemy
     Vector3 rockBase;
     float introStart, nextRumble;
     bool introHatched;
+    // death
+    bool dying;
+    float deathStart;
+    float nextCrumble;
+    bool deathBurst;
     // enrage
     bool enrageStarted;
     float enrageBannerStart = -10f, nextRoarFx;
@@ -56,12 +64,18 @@ public class Boss : Enemy
     public float IntroTime => Time.time - introStart;
     public float EnrageBannerAge => Time.time - enrageBannerStart;
     public bool InEnrageTransition => phase == Phase.Transition;
+    public bool Dying => dying;
+    public bool CutsceneActive => IntroActive || dying;
+    public float DeathAge => Time.unscaledTime - deathStart;
+    // white flashes at the killing blow and at the final burst, for the UI
+    public float DeathFlash => !dying ? 0f : Mathf.Max(Mathf.Clamp01(1f - DeathAge / 0.4f) * 0.75f,
+        deathBurst ? Mathf.Clamp01(1f - (DeathAge - DeathCrumble) / 0.6f) : 0f);
 
     public bool Enraged => forceEnraged || enrageStarted;
     float ChaseTime => Enraged ? 1.1f : 1.8f;
     float ChargeSpeed => Enraged ? 18f : 15f;
 
-    protected override bool CanBeHurt => !IntroActive && phase != Phase.Transition;
+    protected override bool CanBeHurt => !IntroActive && !dying && phase != Phase.Transition;
 
     protected override int ContactDamage => phase == Phase.Charge ? stats.attack * 2 : stats.attack;
 
@@ -105,7 +119,7 @@ public class Boss : Enemy
 
     protected override void Move(Player p)
     {
-        if (!enrageStarted && !IntroActive && p != null && Hp * 2 <= MaxHp) StartEnrage();
+        if (!enrageStarted && !IntroActive && !dying && p != null && Hp * 2 <= MaxHp) StartEnrage();
 
         telegraphing = phase == Phase.Telegraph || handSlamAt >= 0f;
         if (handSlamAt >= 0f && Time.time >= handSlamAt) HandSlam();
@@ -206,7 +220,72 @@ public class Boss : Enemy
     protected override void OnDestroy()
     {
         if (rockGo != null) Destroy(rockGo); // e.g. when the stage is changed during the intro
+        // never leave the game in slow motion if the boss disappears while dying (e.g. a stage jump)
+        if (dying) Time.timeScale = 1f;
         base.OnDestroy();
+    }
+
+    // ---- death: the boss does not simply vanish; it crumbles in slow motion and bursts apart ----
+
+    protected override bool StartDeath()
+    {
+        if (dying) return true;
+        dying = true;
+        deathStart = Time.unscaledTime;
+        nextCrumble = 0f;
+        deathBurst = false;
+        handSlamAt = -1f;
+        telegraphing = false;
+        rb.linearVelocity = Vector2.zero;
+
+        // the player and the rest of the field wait while it happens
+        if (GameManager.Instance != null) GameManager.Instance.BeginBossFinale();
+        Time.timeScale = 0.25f;
+        HitFx.Burst(Col.bounds.center, new Color(1f, 0.85f, 0.5f), 40);
+        HitFx.Shake(0.55f, 0.8f);
+        return true;
+    }
+
+    void UpdateDeath()
+    {
+        float t = DeathAge;
+        // flicker and tremble
+        visual.color = Color.Lerp(Color.white, new Color(1f, 0.3f, 0.2f), Mathf.PingPong(t * 9f, 1f));
+        VisualTransform.localPosition = new Vector3(Random.Range(-0.1f, 0.1f), Random.Range(-0.04f, 0.04f), 0f);
+
+        if (!deathBurst)
+        {
+            // stone fragments keep breaking off
+            if (t >= nextCrumble)
+            {
+                nextCrumble = t + 0.11f;
+                var b = Col.bounds;
+                var at = new Vector2(Random.Range(b.min.x, b.max.x), Random.Range(b.min.y, b.max.y));
+                HitFx.Burst(at, Random.value < 0.5f ? new Color(0.68f, 0.62f, 0.54f) : new Color(1f, 0.55f, 0.3f), 5);
+                HitFx.Shake(0.18f, 0.2f);
+            }
+            if (t >= DeathCrumble)
+            {
+                // the final burst
+                deathBurst = true;
+                var c = (Vector2)Col.bounds.center;
+                HitFx.Burst(c, new Color(1f, 0.9f, 0.6f), 60);
+                HitFx.Burst(c, new Color(0.68f, 0.62f, 0.54f), 50);
+                HitFx.Burst(c + Vector2.up * 0.8f, new Color(1f, 0.45f, 0.2f), 40);
+                Dust.Spawn(new Vector2(c.x - 1.2f, Col.bounds.min.y + 0.4f), 3.5f);
+                Dust.Spawn(new Vector2(c.x + 1.2f, Col.bounds.min.y + 0.4f), 3.5f);
+                Dust.Spawn(new Vector2(c.x, Col.bounds.min.y + 0.8f), 4.5f);
+                HitFx.Shake(1.0f, 1.0f);
+                SetVisualVisible(false);
+                Time.timeScale = 1f;
+            }
+        }
+        else if (t >= DeathEnd)
+        {
+            Time.timeScale = 1f;
+            dying = false;
+            Destroy(gameObject); // the game is cleared as soon as the field is empty
+        }
     }
 
     // ---- intro: a boulder that cracks open into the golem ----
@@ -238,6 +317,7 @@ public class Boss : Enemy
 
     void LateUpdate()
     {
+        if (dying) UpdateDeath();
         if (!IntroActive) return;
         float t = IntroTime;
 

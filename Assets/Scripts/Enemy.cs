@@ -32,6 +32,7 @@ public class Enemy : MonoBehaviour
     protected virtual bool IgnorePlatforms => false;
     protected virtual float AggroRange => aggroRange;
     protected virtual bool CanBeHurt => true; // the boss ignores hits during its intro and its enrage
+    protected virtual bool StartDeath() => false; // a subclass can play its own death and destroy itself later
 
     // Enemies on the wide stage maps stay idle until the player comes close, then chase for good.
     public float aggroRange = 12f;
@@ -200,6 +201,7 @@ public class Enemy : MonoBehaviour
         flashUntil = Time.time + 0.1f;
 
         var center = (Vector2)Col.bounds.center;
+        if (hp <= 0 && StartDeath()) return;
         if (hp <= 0)
         {
             HitFx.Burst(center, new Color(1f, 0.55f, 0.3f), 16);
