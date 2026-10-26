@@ -283,6 +283,26 @@ public partial class GameManager
         Text(new Rect(0f, band.y + 76f, uiWidth, 28f), StageHint(pendingStage), 19, new Color(Soft.r, Soft.g, Soft.b, Soft.a * alpha), TextAnchor.MiddleCenter);
     }
 
+    // The recall rune as an emblem: a diamond (0.5 x 0.7 of the scale) with the rune letter drawn from rotated bars.
+    void DrawRuneEmblem(Vector2 c, float scale)
+    {
+        RotateUi(45f, c);
+        Fill(new Rect(c.x - 0.25f * scale, c.y - 0.35f * scale, 0.5f * scale, 0.7f * scale), RuneItem.DiamondColor);
+        ResetRotation();
+        float thick = RuneItem.GlyphThickness * scale;
+        for (int i = 0; i < RuneItem.GlyphStrokes.GetLength(0); i++)
+        {
+            // the letter's points are y up; the UI is y down
+            Vector2 a = RuneItem.GlyphPoints[RuneItem.GlyphStrokes[i, 0]], b = RuneItem.GlyphPoints[RuneItem.GlyphStrokes[i, 1]];
+            Vector2 pa = c + new Vector2(a.x, -a.y) * scale, pb = c + new Vector2(b.x, -b.y) * scale;
+            Vector2 mid = (pa + pb) * 0.5f;
+            float len = Vector2.Distance(pa, pb) + thick;
+            RotateUi(Mathf.Atan2(pb.y - pa.y, pb.x - pa.x) * Mathf.Rad2Deg, mid);
+            Fill(new Rect(mid.x - len * 0.5f, mid.y - thick * 0.5f, len, thick), RuneItem.GlyphInk);
+        }
+        ResetRotation();
+    }
+
     // The card shown when the recall rune is taken: a small animated picture and a short explanation.
     void DrawRuneTutorial()
     {
@@ -292,11 +312,8 @@ public partial class GameManager
         Panel(panel, 0.92f);
         Frame(panel, new Color(Gold.r, Gold.g, Gold.b, 0.85f), 2f);
 
-        // title with the rune's diamond
-        var dc = new Vector2(cx - 205f, panel.y + 50f);
-        RotateUi(45f, dc);
-        Fill(new Rect(dc.x - 11f, dc.y - 11f, 22f, 22f), new Color(0.5f, 0.95f, 1f));
-        ResetRotation();
+        // title with the rune: the diamond and the letter Raido on it
+        DrawRuneEmblem(new Vector2(cx - 215f, panel.y + 50f), 60f);
         Text(new Rect(panel.x, panel.y + 24f, panel.width, 52f), "회수의 룬 획득!", 38, Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
         Text(new Rect(panel.x, panel.y + 80f, panel.width, 28f), "새로운 기술 : 무기 회수", 20, Color.white, TextAnchor.MiddleCenter);
 
