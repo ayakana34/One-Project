@@ -157,10 +157,15 @@ public class StageAutoShot : MonoBehaviour
         Shot("2_mid");
         yield return LeaveByExit("exit_2", 3);
 
-        // Boss stage: killing the boss clears the game
+        // Boss stage: a cutscene first (boulder -> golem), then the fight; killing the boss clears the game
         yield return WaitFor(() => FindObjectsByType<Boss>(FindObjectsSortMode.None).Length > 0, 10f);
-        yield return new WaitForSecondsRealtime(0.5f);
-        Report("boss stage");
+        yield return new WaitForSecondsRealtime(0.4f);
+        Report("boss intro running (state must be Intro)");
+        Shot("4_intro_boulder");
+        yield return new WaitForSecondsRealtime(2.2f);
+        Shot("4_intro_golem");
+        yield return WaitFor(() => gm.State == GameManager.GameState.Playing, 12f);
+        Report("boss stage (state must be Playing after the intro)");
         Shot("4_boss");
         foreach (var boss in FindObjectsByType<Boss>(FindObjectsSortMode.None)) boss.TakeHit(100000);
         yield return WaitFor(() => gm.State == GameManager.GameState.Won, 10f);

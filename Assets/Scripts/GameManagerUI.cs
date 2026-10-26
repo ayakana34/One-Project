@@ -120,12 +120,14 @@ public partial class GameManager
         if (State == GameState.Title) DrawMenu(true);
         else
         {
-            DrawHud();
+            if (State != GameState.Intro) DrawHud(); // the cutscene has the screen to itself
             if (State == GameState.Playing)
             {
                 DrawExitHint(s);
                 DrawStageBanner();
+                DrawEnrageBanner();
             }
+            if (State == GameState.Intro) DrawBossIntro();
             if (State == GameState.Tutorial) DrawRuneTutorial();
             if (State == GameState.Reward) DrawRewards();
             if (State == GameState.Paused) DrawMenu(false);
@@ -232,7 +234,7 @@ public partial class GameManager
             Text(b, "보스", 15, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
         }
 
-        Text(new Rect(16f, UiHeight - 32f, 360f, 24f), "R 다시 시작   ·   Esc 메뉴", 14, new Color(1f, 1f, 1f, 0.4f));
+        Text(new Rect(16f, UiHeight - 32f, 700f, 24f), stageJumpKeys ? "R 다시 시작   ·   Esc 메뉴   ·   F1~F4 스테이지 이동" : "R 다시 시작   ·   Esc 메뉴", 14, new Color(1f, 1f, 1f, 0.4f));
     }
 
     void DrawExitHint(float scale)
@@ -347,6 +349,78 @@ public partial class GameManager
         Text(new Rect(panel.x + 30f, panel.y + 436f, panel.width - 60f, 26f), "쿨타임 4초  ·  무기가 손에 없을 때만 쓸 수 있습니다", 16, Gold, TextAnchor.MiddleCenter);
 
         if (UiButton(new Rect(cx - 130f, panel.yMax - 76f, 260f, 50f), "확인  (Enter)", true)) CloseRuneTutorial();
+    }
+
+    // The boss cutscene: letterbox bars and, once the golem has burst out of the boulder, its portrait and name.
+    void DrawBossIntro()
+    {
+        var boss = Boss.Current;
+        if (boss == null) return;
+        float t = boss.IntroTime;
+
+        // black bars slide in from the top and bottom
+        float bar = Mathf.Clamp01(t / 0.5f) * 64f;
+        Fill(new Rect(0f, 0f, uiWidth, bar), Color.black);
+        Fill(new Rect(0f, UiHeight - bar, uiWidth, bar), Color.black);
+
+        const float cardIn = 2.1f, cardOut = 4.3f;
+        float alpha = Mathf.Clamp01((t - cardIn) / 0.4f) * Mathf.Clamp01((cardOut + 0.4f - t) / 0.4f);
+        if (alpha <= 0f) return;
+
+        float slide = (1f - Mathf.Clamp01((t - cardIn) / 0.4f)) * 60f;
+        var band = new Rect(0f, UiHeight * 0.5f - 20f, uiWidth, 190f);
+        Fill(band, new Color(Ink.r, Ink.g, Ink.b, 0.82f * alpha));
+        Fill(new Rect(0f, band.y, uiWidth, 2f), new Color(Gold.r, Gold.g, Gold.b, 0.85f * alpha));
+        Fill(new Rect(0f, band.yMax - 2f, uiWidth, 2f), new Color(Gold.r, Gold.g, Gold.b, 0.85f * alpha));
+
+        // portrait
+        var frame = new Rect(uiWidth * 0.5f - 400f - slide, band.y + 15f, 160f, 160f);
+        Fill(frame, new Color(0.08f, 0.09f, 0.13f, alpha));
+        Frame(frame, new Color(Gold.r, Gold.g, Gold.b, alpha), 3f);
+        var sprite = boss.idleSprite;
+        if (sprite != null)
+        {
+            var tex = sprite.texture;
+            var tr = sprite.textureRect;
+            float aspect = tr.width / tr.height;
+            float h = frame.height - 14f, w = h * aspect;
+            if (w > frame.width - 14f) { w = frame.width - 14f; h = w / aspect; }
+            var img = new Rect(frame.center.x - w * 0.5f, frame.center.y - h * 0.5f, w, h);
+            GUI.color = new Color(1f, 1f, 1f, alpha);
+            GUI.DrawTextureWithTexCoords(img, tex, new Rect(tr.x / tex.width, tr.y / tex.height, tr.width / tex.width, tr.height / tex.height));
+            GUI.color = Color.white;
+        }
+
+        // name
+        float tx = frame.xMax + 36f;
+        Text(new Rect(tx + slide, band.y + 28f, 700f, 28f), "최종 보스", 20, new Color(Gold.r, Gold.g, Gold.b, alpha), TextAnchor.MiddleLeft, FontStyle.Bold);
+        Text(new Rect(tx + slide, band.y + 58f, 700f, 70f), BossName, 60, new Color(1f, 1f, 1f, alpha), TextAnchor.MiddleLeft, FontStyle.Bold);
+        Text(new Rect(tx + slide, band.y + 132f, 700f, 30f), BossTagline, 20, new Color(Soft.r, Soft.g, Soft.b, Soft.a * alpha), TextAnchor.MiddleLeft);
+
+        if (t > 0.6f) Text(new Rect(0f, UiHeight - 58f, uiWidth - 24f, 24f), "Enter  건너뛰기", 14, new Color(1f, 1f, 1f, 0.5f), TextAnchor.MiddleRight);
+    }
+
+    const string BossName = "대지의 파수꾼";
+    const string BossTagline = "잠들어 있던 거대한 바위 골렘";
+
+    // The boss goes berserk: a red flash and a big word while it cannot be hurt.
+    void DrawEnrageBanner()
+    {
+        var boss = Boss.Current;
+        if (boss == null || !boss.InEnrageTransition) return;
+        float age = boss.EnrageBannerAge;
+        float fadeIn = Mathf.Clamp01(age / 0.2f);
+        float fadeOut = Mathf.Clamp01((2.0f - age) / 0.4f);
+        float a = fadeIn * fadeOut;
+
+        // red edges pulse
+        float pulse = 0.12f + 0.1f * Mathf.PingPong(Time.time * 5f, 1f);
+        Fill(new Rect(0f, 0f, uiWidth, UiHeight), new Color(0.8f, 0.05f, 0.05f, pulse * a));
+
+        float punch = 1f + (1f - Mathf.Clamp01(age / 0.25f)) * 0.35f;
+        int size = Mathf.RoundToInt(86f * punch);
+        Text(new Rect(0f, UiHeight * 0.26f, uiWidth, 110f), "광분!", size, new Color(1f, 0.28f, 0.22f, a), TextAnchor.MiddleCenter, FontStyle.Bold);
+        Text(new Rect(0f, UiHeight * 0.26f + 100f, uiWidth, 30f), "보스가 분노했습니다", 22, new Color(1f, 1f, 1f, a), TextAnchor.MiddleCenter);
     }
 
     // ------------------------------------------------------------------ menus and end screens

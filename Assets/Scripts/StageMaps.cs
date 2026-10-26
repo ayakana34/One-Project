@@ -133,14 +133,14 @@ public static class StageMaps
     // The boss arena: a single screen.
     public static readonly StageMapDef Arena = new StageMapDef
     {
-        name = "Arena", minX = -10f, maxX = 10f, playerStartX = 0f,
+        name = "Arena", minX = -10f, maxX = 10f, playerStartX = -5f,
         backgroundColor = new Color(0.22f, 0.12f, 0.13f), groundColor = new Color(0.46f, 0.3f, 0.3f), stripeColor = new Color(0.28f, 0.16f, 0.17f),
         blocks = new Vector3[0], platforms = new Vector3[0], enemies = new EnemySpawn[0]
     };
 
     public static readonly StageMapDef ArenaWithPlatforms = new StageMapDef
     {
-        name = "Arena", minX = -10f, maxX = 10f, playerStartX = 0f,
+        name = "Arena", minX = -10f, maxX = 10f, playerStartX = -5f,
         backgroundColor = new Color(0.22f, 0.12f, 0.13f), groundColor = new Color(0.46f, 0.3f, 0.3f), stripeColor = new Color(0.28f, 0.16f, 0.17f),
         blocks = new Vector3[0],
         platforms = new[] { P(-5f, Tier1, 4f), P(5f, Tier1, 4f), P(0f, Tier2, 4f) },

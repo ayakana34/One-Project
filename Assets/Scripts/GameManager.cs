@@ -6,7 +6,7 @@ using UnityEngine.SceneManagement;
 
 public partial class GameManager : MonoBehaviour
 {
-    public enum GameState { Title, Playing, Reward, Lost, Paused, Won, Tutorial }
+    public enum GameState { Title, Playing, Reward, Lost, Paused, Won, Tutorial, Intro }
 
     public static GameManager Instance { get; private set; }
 
@@ -31,6 +31,8 @@ public partial class GameManager : MonoBehaviour
     public bool removePlatformsDuringBoss = true;
     [Tooltip("Open a reward card screen every time a stage is left (off: stages just follow each other).")]
     public bool rewardAfterEveryStage = false;
+    [Tooltip("Development shortcut: F1 stage 1, F2 the rune cave, F3 stage 2, F4 the boss. Turn it off for a release build.")]
+    public bool stageJumpKeys = true;
 
     public Player Player { get; private set; }
     public GameState State { get; private set; }
@@ -162,6 +164,15 @@ public partial class GameManager : MonoBehaviour
             if (kb != null && kb.escapeKey.wasPressedThisFrame) Resume();
             return;
         }
+        if (stageJumpKeys && kb != null)
+        {
+            int jump = kb.f1Key.wasPressedThisFrame ? 0 : kb.f2Key.wasPressedThisFrame ? 1 : kb.f3Key.wasPressedThisFrame ? 2 : kb.f4Key.wasPressedThisFrame ? 3 : -1;
+            if (jump >= 0)
+            {
+                JumpToStage(StageOrder[jump]);
+                return;
+            }
+        }
         if (State == GameState.Tutorial)
         {
             // closed with Enter, Space, Esc or a click (not in the first moment, so the pickup itself cannot close it)
@@ -180,6 +191,15 @@ public partial class GameManager : MonoBehaviour
         if (kb != null && kb.rKey.wasPressedThisFrame)
         {
             RestartGame();
+            return;
+        }
+
+        if (State == GameState.Intro)
+        {
+            // the boss cutscene: the fight starts when the boss says so; Enter or Space skips it
+            var boss = Boss.Current;
+            if (boss == null || !boss.IntroActive) State = GameState.Playing;
+            else if (kb != null && boss.IntroTime > 0.6f && (kb.enterKey.wasPressedThisFrame || kb.spaceKey.wasPressedThisFrame)) boss.SkipIntro();
             return;
         }
 
@@ -409,13 +429,38 @@ public partial class GameManager : MonoBehaviour
         if (camFollow != null) camFollow.SetBounds(map.minX, map.maxX, true);
     }
 
+    // Development shortcut (the F keys): start any stage right away with full health.
+    void JumpToStage(int s)
+    {
+        if (!StageReady(s)) return;
+        Time.timeScale = 1f;
+        State = GameState.Playing;
+        bannerUntil = -1f;
+        Player.Heal(1f);
+        if (s == StageAir || s == StageBoss) Player.GrantRecall(); // the rune cave comes before them
+        BeginStage(s, s == StageGround);
+        SpawnStage(s);
+        if (s == StageBoss && Boss.Current != null)
+        {
+            State = GameState.Intro;
+            Boss.Current.StartIntro();
+        }
+        else bannerUntil = Time.time + 1.5f;
+    }
+
     void GoToNextStage()
     {
         int next = NextStage();
         if (next < 0) return;
         BeginStage(next, false);
         SpawnStage(next);
-        bannerUntil = Time.time + 1.5f;
+        if (next == StageBoss && Boss.Current != null)
+        {
+            // the boss arrives as a boulder: a short cutscene instead of the stage banner
+            State = GameState.Intro;
+            Boss.Current.StartIntro();
+        }
+        else bannerUntil = Time.time + 1.5f;
     }
 
     void ClearField()

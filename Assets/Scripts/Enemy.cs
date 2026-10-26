@@ -15,6 +15,13 @@ public class Enemy : MonoBehaviour
     [System.NonSerialized] public Color tint = Color.white; // e.g. stone grey for the boss's golems, red when the boss is enraged
 
     public Collider2D Col { get; private set; }
+    public Bounds VisualBounds => visual != null ? visual.bounds : sr.bounds;
+    public Transform VisualTransform => visual != null ? visual.transform : transform;
+    public void SetVisualVisible(bool on)
+    {
+        if (visual != null) visual.enabled = on;
+        else sr.enabled = on;
+    }
     public int Hp => hp;
     public int MaxHp => stats.maxHp;
 
@@ -24,6 +31,7 @@ public class Enemy : MonoBehaviour
     protected virtual float GravityScale => 3f;
     protected virtual bool IgnorePlatforms => false;
     protected virtual float AggroRange => aggroRange;
+    protected virtual bool CanBeHurt => true; // the boss ignores hits during its intro and its enrage
 
     // Enemies on the wide stage maps stay idle until the player comes close, then chase for good.
     public float aggroRange = 12f;
@@ -35,13 +43,13 @@ public class Enemy : MonoBehaviour
 
     // A monster that has just appeared cannot hurt by touch for a moment, so a stage change never costs health at once.
     const float SpawnGrace = 0.75f;
-    float harmlessUntil;
+    protected float harmlessUntil;
 
     int hp;
     float flashUntil;
     Color baseColor;
-    SpriteRenderer sr;
-    SpriteRenderer visual;
+    protected SpriteRenderer sr;
+    protected SpriteRenderer visual;
 
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() => All.Clear();
@@ -182,6 +190,12 @@ public class Enemy : MonoBehaviour
 
     public void TakeHit(int damage)
     {
+        if (!CanBeHurt)
+        {
+            HitFx.Sparks(Col.bounds.center, Vector2.up, new Color(0.8f, 0.85f, 1f), 3, 4f);
+            return;
+        }
+
         hp -= stats.Reduce(damage);
         flashUntil = Time.time + 0.1f;
 
