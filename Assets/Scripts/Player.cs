@@ -92,7 +92,9 @@ public class Player : MonoBehaviour
     {
         var kb = Keyboard.current;
         var mouse = Mouse.current;
-        active = kb != null && mouse != null && !Dead && GameManager.Instance.State == GameManager.GameState.Playing;
+        // not on the frame a card was closed: the same click would otherwise throw the weapon
+        active = kb != null && mouse != null && !Dead && GameManager.Instance.State == GameManager.GameState.Playing
+            && Time.frameCount > GameManager.Instance.InputSuppressedThroughFrame;
 
         if (dropCollider != null && Time.time >= dropUntil)
         {

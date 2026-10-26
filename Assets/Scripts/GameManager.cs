@@ -596,10 +596,15 @@ public partial class GameManager : MonoBehaviour
         if (State == GameState.Playing) State = GameState.Intro;
     }
 
+    // The last frame in which the player ignores input: the click or key that closes a card must not also act in the game
+    // (a click on the card used to throw the weapon as well).
+    public int InputSuppressedThroughFrame { get; private set; } = -1;
+
     void CloseRuneTutorial()
     {
         State = GameState.Playing;
         Time.timeScale = 1f;
+        InputSuppressedThroughFrame = Time.frameCount;
     }
 
     void StartGame()
