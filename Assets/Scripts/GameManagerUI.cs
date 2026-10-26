@@ -16,6 +16,7 @@ public partial class GameManager
     static readonly Color DashColor = new Color(0.42f, 0.82f, 1f);
 
     GUIStyle uiText, buttonStyle, buttonPrimaryStyle;
+    Matrix4x4 uiMatrix = Matrix4x4.identity;
     float uiWidth, hpTrail = -1f;
     float lastTrailTime;
 
@@ -23,6 +24,14 @@ public partial class GameManager
     static Texture2D Solid => solid != null ? solid : (solid = Texture2D.whiteTexture);
 
     // ------------------------------------------------------------------ drawing helpers
+
+    // GUIUtility.RotateAroundPivot takes its pivot in unscaled screen pixels; this one takes virtual UI coordinates.
+    void RotateUi(float degrees, Vector2 pivot)
+    {
+        GUI.matrix = uiMatrix * Matrix4x4.TRS(pivot, Quaternion.Euler(0f, 0f, degrees), Vector3.one) * Matrix4x4.TRS(-pivot, Quaternion.identity, Vector3.one);
+    }
+
+    void ResetRotation() => GUI.matrix = uiMatrix;
 
     static void Fill(Rect r, Color c)
     {
@@ -105,7 +114,8 @@ public partial class GameManager
         float s = Screen.height / UiHeight;
         uiWidth = Screen.width / s;
         var oldMatrix = GUI.matrix;
-        GUI.matrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
+        uiMatrix = Matrix4x4.Scale(new Vector3(s, s, 1f));
+        GUI.matrix = uiMatrix;
 
         if (State == GameState.Title) DrawMenu(true);
         else
@@ -116,7 +126,7 @@ public partial class GameManager
                 DrawExitHint(s);
                 DrawStageBanner();
             }
-            DrawRuneToast();
+            if (State == GameState.Tutorial) DrawRuneTutorial();
             if (State == GameState.Reward) DrawRewards();
             if (State == GameState.Paused) DrawMenu(false);
             if (State == GameState.Lost) DrawGameOver();
@@ -219,7 +229,7 @@ public partial class GameManager
             Fill(new Rect(b.x, b.y, b.width * br, b.height), br > 0.5f ? new Color(0.86f, 0.24f, 0.24f) : new Color(1f, 0.4f, 0.2f));
             Fill(new Rect(b.x, b.y, b.width * br, 3f), new Color(1f, 1f, 1f, 0.28f));
             Frame(b, new Color(1f, 1f, 1f, 0.3f));
-            Text(b, "보스   " + boss.Hp + " / " + boss.MaxHp, 15, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
+            Text(b, "보스", 15, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
         }
 
         Text(new Rect(16f, UiHeight - 32f, 360f, 24f), "R 다시 시작   ·   Esc 메뉴", 14, new Color(1f, 1f, 1f, 0.4f));
@@ -269,25 +279,74 @@ public partial class GameManager
         Text(new Rect(0f, band.y + 76f, uiWidth, 28f), StageHint(pendingStage), 19, new Color(Soft.r, Soft.g, Soft.b, Soft.a * alpha), TextAnchor.MiddleCenter);
     }
 
-    void DrawRuneToast()
+    // The card shown when the recall rune is taken: a small animated picture and a short explanation.
+    void DrawRuneTutorial()
     {
-        if (runeMessageUntil <= Time.unscaledTime || State == GameState.Lost) return;
-        float left = runeMessageUntil - Time.unscaledTime;
-        float alpha = Mathf.Clamp01(left / 0.6f);
-        var r = new Rect(uiWidth * 0.5f - 270f, 108f, 540f, 76f);
-        GUI.color = new Color(1f, 1f, 1f, alpha);
-        Panel(r, 0.8f);
-        Frame(r, new Color(Gold.r, Gold.g, Gold.b, 0.8f * alpha), 2f);
-        GUI.color = Color.white;
+        Fill(new Rect(0f, 0f, uiWidth, UiHeight), new Color(0f, 0f, 0f, 0.62f));
+        float cx = uiWidth * 0.5f;
+        var panel = new Rect(cx - 330f, 60f, 660f, 580f);
+        Panel(panel, 0.92f);
+        Frame(panel, new Color(Gold.r, Gold.g, Gold.b, 0.85f), 2f);
 
-        var m = GUI.matrix;
-        var c = new Vector2(r.x + 40f, r.center.y);
-        GUIUtility.RotateAroundPivot(45f, c);
-        Fill(new Rect(c.x - 11f, c.y - 11f, 22f, 22f), new Color(0.5f, 0.95f, 1f, alpha));
-        GUI.matrix = m;
+        // title with the rune's diamond
+        var dc = new Vector2(cx - 205f, panel.y + 50f);
+        RotateUi(45f, dc);
+        Fill(new Rect(dc.x - 11f, dc.y - 11f, 22f, 22f), new Color(0.5f, 0.95f, 1f));
+        ResetRotation();
+        Text(new Rect(panel.x, panel.y + 24f, panel.width, 52f), "회수의 룬 획득!", 38, Gold, TextAnchor.MiddleCenter, FontStyle.Bold);
+        Text(new Rect(panel.x, panel.y + 80f, panel.width, 28f), "새로운 기술 : 무기 회수", 20, Color.white, TextAnchor.MiddleCenter);
 
-        Text(new Rect(r.x + 72f, r.y + 8f, r.width - 80f, 32f), "회수의 룬 획득!", 26, new Color(Gold.r, Gold.g, Gold.b, alpha), TextAnchor.MiddleLeft, FontStyle.Bold);
-        Text(new Rect(r.x + 72f, r.y + 42f, r.width - 80f, 26f), "Q 키로 던진 무기를 손으로 불러옵니다 (쿨타임 4초)", 16, new Color(1f, 1f, 1f, alpha));
+        // picture: the weapon lies far away, Q pulls it back into the hand
+        var pic = new Rect(panel.x + 30f, panel.y + 124f, panel.width - 60f, 200f);
+        Fill(pic, new Color(0.1f, 0.12f, 0.17f, 1f));
+        Frame(pic, new Color(1f, 1f, 1f, 0.16f));
+        float ground = pic.y + 150f;
+        Fill(new Rect(pic.x, ground, pic.width, pic.yMax - ground), new Color(0.3f, 0.32f, 0.4f));
+        Fill(new Rect(pic.x, ground, pic.width, 3f), new Color(1f, 1f, 1f, 0.25f));
+
+        float px = pic.x + 90f, wx = pic.xMax - 100f;
+        // the player: a hooded figure with an empty hand
+        Fill(new Rect(px - 14f, ground - 56f, 28f, 56f), new Color(0.32f, 0.46f, 0.72f));
+        Fill(new Rect(px - 12f, ground - 78f, 24f, 24f), new Color(0.2f, 0.3f, 0.52f));
+        Fill(new Rect(px - 5f, ground - 70f, 10f, 8f), new Color(0.85f, 0.88f, 0.95f));
+        Text(new Rect(px - 50f, ground + 6f, 100f, 24f), "플레이어", 15, Soft, TextAnchor.MiddleCenter);
+
+        // the weapon lying on the ground far away
+        var wc = new Vector2(wx, ground - 8f);
+        RotateUi(-12f, wc);
+        Fill(new Rect(wx - 24f, ground - 12f, 48f, 8f), new Color(0.92f, 0.94f, 1f));
+        Fill(new Rect(wx - 24f, ground - 12f, 14f, 8f), new Color(0.7f, 0.55f, 0.25f));
+        ResetRotation();
+        Text(new Rect(wx - 60f, ground + 6f, 120f, 24f), "떨어진 무기", 15, Soft, TextAnchor.MiddleCenter);
+
+        // the way back: moving dots from the weapon to the player
+        const int dots = 9;
+        float phase = Time.unscaledTime * 6f;
+        for (int i = 0; i < dots; i++)
+        {
+            float t = (i + 0.5f) / dots;
+            float x = Mathf.Lerp(wx - 30f, px + 26f, t);
+            float y = ground - 34f - Mathf.Sin(t * Mathf.PI) * 34f;
+            float lit = Mathf.Clamp01(1f - Mathf.Abs(((phase - (dots - 1 - i)) % dots + dots) % dots) / 3f);
+            Fill(new Rect(x - 4f, y - 4f, 8f, 8f), Color.Lerp(new Color(1f, 1f, 1f, 0.3f), Gold, lit));
+        }
+        Text(new Rect(px + 6f, ground - 72f, 30f, 28f), "◀", 22, Gold, TextAnchor.MiddleCenter);
+
+        // the Q key above the middle of the path
+        var key = new Rect((px + wx) * 0.5f - 22f, pic.y + 10f, 44f, 38f);
+        Fill(new Rect(key.x, key.y + 4f, key.width, key.height), new Color(0f, 0f, 0f, 0.4f));
+        Fill(key, new Color(0.2f, 0.23f, 0.3f));
+        Frame(key, Gold, 2f);
+        Text(key, "Q", 24, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold, false);
+        Text(new Rect(key.x - 40f, key.yMax + 2f, key.width + 80f, 22f), "누르면", 15, Soft, TextAnchor.MiddleCenter);
+
+        // explanation
+        Text(new Rect(panel.x + 30f, panel.y + 340f, panel.width - 60f, 30f), "무기를 던지면 지형에 튕겨 멀리 떨어질 수 있습니다.", 18, Color.white, TextAnchor.MiddleCenter);
+        Text(new Rect(panel.x + 30f, panel.y + 368f, panel.width - 60f, 30f), "그때 Q 키를 누르면 무기가 곧바로 손으로 돌아옵니다.", 18, Color.white, TextAnchor.MiddleCenter);
+        Text(new Rect(panel.x + 30f, panel.y + 398f, panel.width - 60f, 30f), "돌아오는 길에 있는 적에게도 피해를 줍니다!", 18, new Color(1f, 0.6f, 0.45f), TextAnchor.MiddleCenter, FontStyle.Bold);
+        Text(new Rect(panel.x + 30f, panel.y + 436f, panel.width - 60f, 26f), "쿨타임 4초  ·  무기가 손에 없을 때만 쓸 수 있습니다", 16, Gold, TextAnchor.MiddleCenter);
+
+        if (UiButton(new Rect(cx - 130f, panel.yMax - 76f, 260f, 50f), "확인  (Enter)", true)) CloseRuneTutorial();
     }
 
     // ------------------------------------------------------------------ menus and end screens
@@ -378,7 +437,7 @@ public partial class GameManager
     {
         StageGround => "스테이지 1",
         StageAir => "스테이지 2",
-        StageRune => "스테이지 3 · 회수의 룬",
+        StageRune => "룬의 동굴",
         _ => "최종 스테이지 · 보스"
     };
 

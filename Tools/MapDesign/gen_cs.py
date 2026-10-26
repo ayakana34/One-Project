@@ -235,8 +235,8 @@ tail = '''
 }
 '''
 
-body = (mapdef("Stage1", g.s1, "Stage 1: the outpost. A gate ledge, a long gentle slope to a plateau with a lookout, a sky route over the open ground and an offset watchtower.")
-        + chr(10) + mapdef("Stage2", g.s2, "Stage 2: the citadel. A rampart with platform lanes, a moat with stepping stones, the keep (low wall, raised hall, tall tower) and a stepped way down.")
+body = (mapdef("Stage1", g.s1, "Stage 1: the outpost. Low terrain only (the recall skill comes later): wide ledges and gentle bumps, no pits or narrow slots.")
+        + chr(10) + mapdef("Stage2", g.s2, "Stage 2: the citadel. A rampart, a moat with a two-tier mound, the keep (low wall, raised hall, tall tower) and a stepped way down.")
         + chr(10) + mapdef("RuneRoom", g.rr, "Stage 3: the rune room. A short flat corridor without monsters: take the recall rune, then leave through the exit."))
 
 io.open("C:/Users/KGA01/UnityProject/One-Project/Assets/Scripts/StageMaps.cs", "w", encoding="utf-8", newline="").write(head + body + tail)

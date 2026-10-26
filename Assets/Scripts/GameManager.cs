@@ -6,12 +6,14 @@ using UnityEngine.SceneManagement;
 
 public partial class GameManager : MonoBehaviour
 {
-    public enum GameState { Title, Playing, Reward, Lost, Paused, Won }
+    public enum GameState { Title, Playing, Reward, Lost, Paused, Won, Tutorial }
 
     public static GameManager Instance { get; private set; }
 
     const float FloorY = -6f;
-    const int StageGround = 0, StageAir = 1, StageRune = 2, StageBoss = 3, StageCount = 4;
+    const int StageGround = 0, StageAir = 1, StageRune = 2, StageBoss = 3;
+    // One run: stage 1 -> the rune room (recall skill) -> stage 2 -> the boss.
+    static readonly int[] StageOrder = { StageGround, StageRune, StageAir, StageBoss };
     const int DashChargeCap = 3;
 
     public float enemyHpGrowth = 0.3f;
@@ -66,7 +68,7 @@ public partial class GameManager : MonoBehaviour
     GameObject[] terrain;
     GameObject runeGo;
     bool runeTaken;
-    float runeMessageUntil, runStartRealtime, clearSeconds;
+    float runStartRealtime, clearSeconds, tutorialOpenedAt;
     SpriteRenderer bgRenderer, floorRenderer;
     readonly List<SpriteRenderer> terrainRenderers = new();
     int stage = StageGround, pendingStage, lastHeal;
@@ -160,6 +162,16 @@ public partial class GameManager : MonoBehaviour
             if (kb != null && kb.escapeKey.wasPressedThisFrame) Resume();
             return;
         }
+        if (State == GameState.Tutorial)
+        {
+            // closed with Enter, Space, Esc or a click (not in the first moment, so the pickup itself cannot close it)
+            var mouse = Mouse.current;
+            bool pressed = kb != null && (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame
+                || kb.spaceKey.wasPressedThisFrame || kb.escapeKey.wasPressedThisFrame);
+            if (mouse != null && mouse.leftButton.wasPressedThisFrame) pressed = true;
+            if (pressed && Time.unscaledTime - tutorialOpenedAt > 0.4f) CloseRuneTutorial();
+            return;
+        }
         if (kb != null && kb.escapeKey.wasPressedThisFrame)
         {
             Pause();
@@ -194,11 +206,13 @@ public partial class GameManager : MonoBehaviour
         _ => bossPrefab != null
     };
 
-    // Stage 1 -> 2 -> rune room -> boss; the run ends with the boss.
+    // The run ends with the boss.
     int NextStage()
     {
-        int s = stage + 1;
-        return s < StageCount && StageReady(s) ? s : -1;
+        int i = Array.IndexOf(StageOrder, stage) + 1;
+        if (i <= 0 || i >= StageOrder.Length) return -1;
+        int s = StageOrder[i];
+        return StageReady(s) ? s : -1;
     }
 
     int RollTier()
@@ -391,6 +405,7 @@ public partial class GameManager : MonoBehaviour
         ClearField();
         ApplyMap(map, s != StageBoss);
         Player.Teleport(new Vector2(map.playerStartX, FloorY + 0.55f));
+        Player.GrantInvulnerability(1f);
         if (camFollow != null) camFollow.SetBounds(map.minX, map.maxX, true);
     }
 
@@ -522,7 +537,17 @@ public partial class GameManager : MonoBehaviour
         runeTaken = true;
         Player.GrantRecall();
         if (runeGo != null) runeGo.SetActive(false);
-        runeMessageUntil = Time.unscaledTime + 6f;
+
+        // the game waits while the card explains how to use the new skill
+        State = GameState.Tutorial;
+        Time.timeScale = 0f;
+        tutorialOpenedAt = Time.unscaledTime;
+    }
+
+    void CloseRuneTutorial()
+    {
+        State = GameState.Playing;
+        Time.timeScale = 1f;
     }
 
     void StartGame()

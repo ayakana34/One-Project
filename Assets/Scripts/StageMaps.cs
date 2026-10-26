@@ -73,7 +73,7 @@ public static class StageMaps
     static EnemySpawn F(float x, float y) => Spawn(EnemyKind.Flyer, x, y);
     static EnemySpawn S(float x) => Spawn(EnemyKind.Shooter, x, ShooterHoverY);
 
-    // Stage 1: the outpost. A gate ledge, a long gentle slope to a plateau with a lookout, a sky route over the open ground and an offset watchtower.
+    // Stage 1: the outpost. Low terrain only (the recall skill comes later): wide ledges and gentle bumps, no pits or narrow slots.
     public static readonly StageMapDef Stage1 = new StageMapDef
     {
         name = "Stage 1", minX = -36f, maxX = 36f, playerStartX = -33f,
@@ -82,23 +82,19 @@ public static class StageMaps
         stripeColor = new Color(0.22f, 0.23f, 0.3f),
         blocks = new[]
         {
-                B(-26f, -3.8f, 4f), B(-20.5f, -5.4f, 3f), B(-17.5f, -4.8f, 3f), B(-14.5f, -4.2f, 3f),
-                B(-11.5f, -3.6f, 3f), B(-8.5f, -3f, 3f), B(-5.5f, -2.4f, 3f), B(0f, -2.4f, 8f),
-                B(5f, -4.2f, 2f), B(20f, -3.8f, 10f), B(19f, -1.6f, 6f), B(18f, 0.6f, 3f)
+                B(-24f, -5.2f, 6f), B(-14f, -5.3f, 4f), B(-10f, -4.6f, 4f), B(-6f, -5.3f, 4f),
+                B(2.5f, -5f, 13f), B(3f, -4.4f, 4f), B(20f, -5.2f, 8f), B(20f, -4.5f, 3f)
         },
-        platforms = new[]
-        {
-                P(0f, 0f, 5f), P(8.5f, -3.6f, 3f), P(11.5f, -1.2f, 3f), P(18f, 3f, 4f)
-        },
+        platforms = new Vector3[0],
         enemies = new[]
         {
-                G(-23f), G(-17.5f), G(-2f), G(10.5f),
-                G(27f), E(-8.5f), E(21f), F(-14f, 3f),
-                F(3f, 3.5f), F(26f, 2.5f), S(-5f), S(18f)
+                G(-24f), G(-10f), G(7f), G(17.3f),
+                G(28f), E(-6f), E(20f), F(-14f, 3f),
+                F(5f, 3.5f), F(22f, 2.5f), S(-5f), S(18f)
         }
     };
 
-    // Stage 2: the citadel. A rampart with platform lanes, a moat with stepping stones, the keep (low wall, raised hall, tall tower) and a stepped way down.
+    // Stage 2: the citadel. A rampart, a moat with a two-tier mound, the keep (low wall, raised hall, tall tower) and a stepped way down.
     public static readonly StageMapDef Stage2 = new StageMapDef
     {
         name = "Stage 2", minX = -46f, maxX = 46f, playerStartX = -43f,
@@ -108,14 +104,10 @@ public static class StageMaps
         blocks = new[]
         {
                 B(-30.75f, -4.4f, 2.5f), B(-28.25f, -3f, 2.5f), B(-25.75f, -1.6f, 2.5f), B(-17f, -1.6f, 15f),
-                B(-7.5f, -3.8f, 4f), B(16f, -3.8f, 8f), B(24f, -1.6f, 10f), B(31f, 0.6f, 4f),
-                B(34.5f, -1.6f, 3f), B(37.5f, -3.8f, 3f)
+                B(-7.5f, -3.8f, 4f), B(-1.5f, -3.8f, 8f), B(-1.5f, -1.6f, 3f), B(16f, -3.8f, 8f),
+                B(24f, -1.6f, 10f), B(31f, 0.6f, 4f), B(34.5f, -1.6f, 3f), B(37.5f, -3.8f, 3f)
         },
-        platforms = new[]
-        {
-                P(-21f, 0.8f, 5f), P(-13f, 1.4f, 5f), P(-2f, -3.6f, 3f), P(2f, -1.2f, 3f),
-                P(6f, 1.2f, 3f), P(24f, 1.4f, 5f), P(41f, -3.6f, 3f)
-        },
+        platforms = new Vector3[0],
         enemies = new[]
         {
                 G(-36f), G(-18f), G(-2f), G(8f),

@@ -6,7 +6,7 @@ using System.Reflection;
 using UnityEditor;
 using UnityEngine;
 
-// Editor-only helper: plays through stage 1 -> 2 -> rune room -> boss (game cleared) and saves screenshots
+// Editor-only helper: plays through stage 1 -> rune room -> stage 2 -> boss (game cleared) and saves screenshots
 // to Library/HoodedDiag/stage_*.png so the stage flow can be checked without watching the editor.
 public class StageAutoShot : MonoBehaviour
 {
@@ -118,7 +118,28 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(1.2f);
         gm.Player.Heal(1f);
         Shot("1_mid");
-        yield return LeaveByExit("exit_1", 1);
+        yield return LeaveByExit("exit_1", 2);
+
+        // Rune room: the exit is open from the start, taking the rune is optional
+        yield return new WaitForSecondsRealtime(0.4f);
+        gm.Player.Heal(1f);
+        CheckMap("rune room");
+        Report("rune room loaded (recall must be off)");
+        Shot("3_banner");
+        yield return new WaitForSecondsRealtime(1.8f);
+        Shot("3_start");
+        var exitGo = GameObject.Find("Exit");
+        Debug.Log("[Stages] rune room exit open before the rune (must be True, the rune is optional): " + typeof(GameManager).GetProperty("ExitOpen", All).GetValue(gm));
+        var rune = FindFirstObjectByType<RuneItem>();
+        Debug.Log("[Stages] rune object: " + (rune != null ? rune.transform.position.ToString("F1") : "none"));
+        gm.Player.Teleport(new Vector2(rune.transform.position.x, rune.transform.position.y - 0.3f));
+        yield return new WaitForSecondsRealtime(0.4f);
+        Report("rune taken (recall must be on, the tutorial card is open)");
+        Shot("3_rune");
+        Invoke("CloseRuneTutorial");
+        GoTo(exitGo.transform.position.x - 0.2f);
+        yield return WaitFor(() => Field("stage") == 1, 3f);
+        Report("left the rune room (must be stage 2)");
 
         // Stage 2
         yield return new WaitForSecondsRealtime(0.4f);
@@ -134,27 +155,7 @@ public class StageAutoShot : MonoBehaviour
         yield return new WaitForSecondsRealtime(1.0f);
         gm.Player.Heal(1f);
         Shot("2_mid");
-        yield return LeaveByExit("exit_2", 2);
-
-        // Rune room: the exit stays closed until the rune is taken
-        yield return new WaitForSecondsRealtime(0.4f);
-        gm.Player.Heal(1f);
-        CheckMap("rune room");
-        Report("rune room loaded (recall must be off)");
-        Shot("3_banner");
-        yield return new WaitForSecondsRealtime(1.8f);
-        Shot("3_start");
-        var exitGo = GameObject.Find("Exit");
-        Debug.Log("[Stages] rune room exit open before the rune (must be True, the rune is optional): " + typeof(GameManager).GetProperty("ExitOpen", All).GetValue(gm));
-        var rune = FindFirstObjectByType<RuneItem>();
-        Debug.Log("[Stages] rune object: " + (rune != null ? rune.transform.position.ToString("F1") : "none"));
-        gm.Player.Teleport(new Vector2(rune.transform.position.x, rune.transform.position.y - 0.3f));
-        yield return new WaitForSecondsRealtime(0.4f);
-        Report("rune taken (recall must be on)");
-        Shot("3_rune");
-        GoTo(exitGo.transform.position.x - 0.2f);
-        yield return WaitFor(() => Field("stage") == 3, 3f);
-        Report("left the rune room (must be the boss stage)");
+        yield return LeaveByExit("exit_2", 3);
 
         // Boss stage: killing the boss clears the game
         yield return WaitFor(() => FindObjectsByType<Boss>(FindObjectsSortMode.None).Length > 0, 10f);

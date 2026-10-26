@@ -35,6 +35,7 @@ public class Weapon : MonoBehaviour
     float traveled;
     int bounces;
     readonly System.Collections.Generic.Dictionary<Enemy, float> lastHit = new();
+    readonly System.Collections.Generic.HashSet<Enemy> recallHit = new(); // monsters already hit by the current recall
 
     public static Weapon Spawn(Player owner, Vector2 pos, Vector2 dir)
     {
@@ -51,7 +52,11 @@ public class Weapon : MonoBehaviour
         if (Current == this) Current = null;
     }
 
-    public void Recall() => phase = Phase.Recalling;
+    public void Recall()
+    {
+        phase = Phase.Recalling;
+        recallHit.Clear();
+    }
 
     void RecallMove()
     {
@@ -59,6 +64,15 @@ public class Weapon : MonoBehaviour
 
         Vector2 to = (Vector2)owner.transform.position - (Vector2)transform.position;
         float step = RecallSpeed * Time.deltaTime;
+
+        // flying back, the weapon hurts every monster on its way once (full damage, like a throw)
+        foreach (var hit in Physics2D.CircleCastAll(transform.position, Radius, to.normalized, Mathf.Min(step, to.magnitude)))
+        {
+            if (hit.collider.isTrigger) continue;
+            var enemy = hit.collider.GetComponentInParent<Enemy>();
+            if (enemy != null && recallHit.Add(enemy)) enemy.TakeHit(owner.WeaponDamage);
+        }
+
         if (to.magnitude <= step + PickupDistance)
         {
             owner.PickUp();

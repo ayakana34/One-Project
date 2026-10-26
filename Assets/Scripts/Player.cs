@@ -299,6 +299,9 @@ public class Player : MonoBehaviour
         DashCharges++;
     }
 
+    // A short grace period, used when a new stage starts.
+    public void GrantInvulnerability(float seconds) => hitInvulnUntil = Mathf.Max(hitInvulnUntil, Time.time + seconds);
+
     public void TakeDamage(int damage)
     {
         if (Invulnerable) return;

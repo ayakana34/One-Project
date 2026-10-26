@@ -10,7 +10,6 @@ public static class GolemSetup
     const string SpriteDir = "Assets/Art/Monsters";
     const string GruntPath = "Assets/Prefabs/Grunt.prefab";
     const string GolemPath = "Assets/Prefabs/Golem.prefab";
-    const string BossPath = "Assets/Prefabs/Boss.prefab";
     const string BulletPath = "Assets/Prefabs/EnemyBullet.prefab";
 
     static string AutoKey => "GolemSetup.Auto.v1." + Application.dataPath;
@@ -40,10 +39,9 @@ public static class GolemSetup
             var bulletSprite = AssetDatabase.LoadAssetAtPath<Sprite>(SpriteDir + "/Bullet.png");
 
             var golem = BuildGolemPrefab(golemSprite);
-            AssignToBoss(golem);
             ApplyToBullet(bulletSprite);
             AssetDatabase.SaveAssets();
-            Debug.Log("[Golem] Golem prefab built (sprite " + (golemSprite != null) + "), given to the boss; bullet sprite " + (bulletSprite != null) + ".");
+            Debug.Log("[Golem] Golem prefab built (sprite " + (golemSprite != null) + "); bullet sprite " + (bulletSprite != null) + ".");
         }
         catch (System.Exception e)
         {
@@ -96,20 +94,6 @@ public static class GolemSetup
             PrefabUtility.UnloadPrefabContents(root);
         }
         return AssetDatabase.LoadAssetAtPath<GameObject>(GolemPath);
-    }
-
-    static void AssignToBoss(GameObject golem)
-    {
-        var root = PrefabUtility.LoadPrefabContents(BossPath);
-        try
-        {
-            root.GetComponent<Boss>().golemPrefab = golem;
-            PrefabUtility.SaveAsPrefabAsset(root, BossPath);
-        }
-        finally
-        {
-            PrefabUtility.UnloadPrefabContents(root);
-        }
     }
 
     static void ApplyToBullet(Sprite sprite)

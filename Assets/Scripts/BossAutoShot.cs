@@ -75,15 +75,13 @@ public class BossAutoShot : MonoBehaviour
             + " bannerUntil=" + typeof(GameManager).GetField("bannerUntil", All).GetValue(gm) + " time=" + Time.time + " dead=" + gm.Player.Dead
             + (boss0 != null ? " bossEnabled=" + boss0.enabled + " dist=" + Vector2.Distance(gm.Player.transform.position, boss0.transform.position) : ""));
         if (boss0 == null) { EditorApplication.isPlaying = false; yield break; }
-        boss0.testSequence = new[] { Boss.Attack.Rock, Boss.Attack.Slam, Boss.Attack.Charge };
+        boss0.testSequence = new[] { Boss.Attack.Slam, Boss.Attack.Charge };
 
-        yield return Watch(7f, "rock");
         yield return Watch(5f, "slam");
         yield return Watch(4f, "charge");
 
-        // enraged: two rocks at once
+        // enraged: the same two attacks, faster
         boss0.forceEnraged = true;
-        boss0.testSequence = new[] { Boss.Attack.Rock };
         yield return Watch(7f, "enraged");
 
         Debug.Log("[Boss] shots done");
