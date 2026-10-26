@@ -417,16 +417,6 @@ MonoBehaviour:
   bossHealFraction: 0.1
   rareChance: 0.25
   epicChance: 0.05
-  gruntMin: 3
-  gruntMax: 5
-  eliteMin: 1
-  eliteMax: 3
-  flyerMin: 1
-  flyerMax: 3
-  shooterMin: 1
-  shooterMax: 3
-  stage1Mix: 0.6
-  stage2Mix: 0.75
   weaponPrefab: {fileID: 2614391950579871068, guid: 34559465129ecb94196e6f3189e0c565, type: 3}
   bossPrefab: {fileID: 6631348005343077189, guid: 884b93df476f6ac47812f73fb083af09, type: 3}
   flyerPrefab: {fileID: 2807060466700949452, guid: 510ab20f5e534e64daf958d59a925f8a, type: 3}
@@ -435,6 +425,7 @@ MonoBehaviour:
   elitePrefab: {fileID: 5891049835770075296, guid: dad6cd2d00b4d8c43b1dc863a38ef418, type: 3}
   removePlatformsDuringBoss: 1
   rewardAfterEveryStage: 0
+  stageJumpKeys: 1
 --- !u!4 &577256761
 Transform:
   m_ObjectHideFlags: 0
