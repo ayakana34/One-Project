@@ -10,7 +10,8 @@ public class Player : MonoBehaviour
     const float GravityScale = 3f;
     const float DashSpeed = 22f;
     const float DashTime = 0.15f;
-    const float DashRechargeTime = 1.5f;
+    const float DashRechargeTime = 1.0f;
+    const float DashBuffer = 0.25f; // a dash pressed a moment too early (during the last dash) still goes off
     const float DashEndInvulnTime = 0.1f;
     const float RecallCooldown = 4f;
     const float HitInvulnTime = 1f;
@@ -28,8 +29,8 @@ public class Player : MonoBehaviour
     public bool Dashing => Time.time < dashUntil;
     public bool HasRecall { get; private set; }
     public float RecallCooldownLeft => Mathf.Max(0f, nextRecall - Time.time);
-    public int MaxDashCharges { get; private set; } = 2;
-    public int DashCharges { get; private set; } = 2;
+    public int MaxDashCharges { get; private set; } = 3;
+    public int DashCharges { get; private set; } = 3;
     public float DashRechargeProgress => DashCharges >= MaxDashCharges ? 1f : Mathf.Clamp01(1f - (rechargeAt - Time.time) / DashRechargeTime);
 
     public SpriteRenderer bodyRenderer;
@@ -57,7 +58,7 @@ public class Player : MonoBehaviour
     Rigidbody2D rb;
     Collider2D col;
     Vector2 dashDir = Vector2.right;
-    float moveX, dashUntil, rechargeAt, hitInvulnUntil, dropUntil, nextRecall;
+    float moveX, dashUntil, rechargeAt, hitInvulnUntil, dropUntil, nextRecall, dashBufferUntil;
     Collider2D dropCollider;
     bool active, jumpRequested, wasDashing, ignoringPlatforms;
     Collider2D[] platforms;
@@ -152,8 +153,10 @@ public class Player : MonoBehaviour
 
         bool dashPressed = kb.leftShiftKey.wasPressedThisFrame || mouse.rightButton.wasPressedThisFrame || testDash;
         testDash = false;
-        if (dashPressed && !Dashing && DashCharges > 0)
+        if (dashPressed) dashBufferUntil = Time.time + DashBuffer;
+        if (Time.time < dashBufferUntil && !Dashing && DashCharges > 0)
         {
+            dashBufferUntil = 0f;
             if (DashCharges == MaxDashCharges) rechargeAt = Time.time + DashRechargeTime;
             DashCharges--;
             dashDir = aim;

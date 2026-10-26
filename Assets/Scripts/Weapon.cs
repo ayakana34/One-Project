@@ -11,7 +11,8 @@ public class Weapon : MonoBehaviour
     [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
     static void ResetStatics() => Current = null;
 
-    const float Speed = 22f;
+    const float Speed = 30f;
+    const float BounceSpeed = 22f; // how fast it bounces off after a hit, kept apart from the flight speed so a faster throw does not scatter it farther
     const float MaxRange = 9f;
     const float Radius = 0.25f;
     const float Gravity = 30f;
@@ -148,7 +149,7 @@ public class Weapon : MonoBehaviour
             else HitFx.Sparks(hit.point, hit.normal, new Color(0.9f, 0.9f, 0.95f), 4, 4f);
 
             phase = Phase.Bouncing;
-            velocity = dir * Speed;
+            velocity = dir * BounceSpeed;
             Rebound(hit.normal, enemy == null);
             if (phase == Phase.Bouncing) Randomize(hit.normal);
             velocity.y += Random.Range(HitKickMin, HitKickMax);
