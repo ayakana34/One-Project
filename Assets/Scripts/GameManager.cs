@@ -34,6 +34,9 @@ public partial class GameManager : MonoBehaviour
     [Tooltip("Development shortcut: F1 stage 1, F2 the rune cave, F3 stage 2, F4 the boss. Turn it off for a release build.")]
     public bool stageJumpKeys = true;
 
+    // The shortcut only works in the editor and in development builds, so a release build never has it.
+    bool StageJumpEnabled => stageJumpKeys && (Application.isEditor || Debug.isDebugBuild);
+
     public Player Player { get; private set; }
     public GameState State { get; private set; }
     public int Round { get; private set; } = 1; // one run has no repeat, so monsters are never scaled up
@@ -71,6 +74,10 @@ public partial class GameManager : MonoBehaviour
     GameObject runeGo;
     bool runeTaken;
     float runStartRealtime, clearSeconds, tutorialOpenedAt;
+    // The clear time counts play time only: it starts when the run starts (not on the title screen) and leaves out the
+    // time spent in the pause menu and on the rune card.
+    float pausedSeconds, pauseBeganAt, cardBeganAt;
+    float RunSeconds => Time.realtimeSinceStartup - runStartRealtime - pausedSeconds;
     SpriteRenderer bgRenderer, floorRenderer;
     readonly List<SpriteRenderer> terrainRenderers = new();
     int stage = StageGround, pendingStage, lastHeal;
@@ -164,7 +171,7 @@ public partial class GameManager : MonoBehaviour
             if (kb != null && kb.escapeKey.wasPressedThisFrame) Resume();
             return;
         }
-        if (stageJumpKeys && kb != null)
+        if (StageJumpEnabled && kb != null)
         {
             int jump = kb.f1Key.wasPressedThisFrame ? 0 : kb.f2Key.wasPressedThisFrame ? 1 : kb.f3Key.wasPressedThisFrame ? 2 : kb.f4Key.wasPressedThisFrame ? 3 : -1;
             if (jump >= 0)
@@ -418,7 +425,11 @@ public partial class GameManager : MonoBehaviour
         stage = s;
         pendingStage = s;
         runeTaken = false;
-        if (first) runStartRealtime = Time.realtimeSinceStartup;
+        if (first)
+        {
+            runStartRealtime = Time.realtimeSinceStartup;
+            pausedSeconds = 0f;
+        }
 
         var map = MapFor(s);
 
@@ -571,7 +582,7 @@ public partial class GameManager : MonoBehaviour
 
     void OnBossDefeated()
     {
-        clearSeconds = Time.realtimeSinceStartup - runStartRealtime;
+        if (clearSeconds <= 0f) clearSeconds = RunSeconds;
         State = GameState.Won;
         Time.timeScale = 0f;
     }
@@ -588,11 +599,13 @@ public partial class GameManager : MonoBehaviour
         State = GameState.Tutorial;
         Time.timeScale = 0f;
         tutorialOpenedAt = Time.unscaledTime;
+        cardBeganAt = Time.realtimeSinceStartup;
     }
 
     // The boss's death sequence takes the screen over like the intro does: nothing else moves until it is over.
     public void BeginBossFinale()
     {
+        clearSeconds = RunSeconds; // the clock stops at the killing blow
         if (State == GameState.Playing) State = GameState.Intro;
     }
 
@@ -602,6 +615,7 @@ public partial class GameManager : MonoBehaviour
 
     void CloseRuneTutorial()
     {
+        pausedSeconds += Time.realtimeSinceStartup - cardBeganAt;
         State = GameState.Playing;
         Time.timeScale = 1f;
         InputSuppressedThroughFrame = Time.frameCount;
@@ -611,10 +625,13 @@ public partial class GameManager : MonoBehaviour
     {
         State = GameState.Playing;
         Time.timeScale = 1f;
+        runStartRealtime = Time.realtimeSinceStartup; // the time on the title screen does not count
+        pausedSeconds = 0f;
     }
 
     void Pause()
     {
+        pauseBeganAt = Time.realtimeSinceStartup;
         stateBeforePause = State;
         timeScaleBeforePause = Time.timeScale;
         State = GameState.Paused;
@@ -623,6 +640,7 @@ public partial class GameManager : MonoBehaviour
 
     void Resume()
     {
+        pausedSeconds += Time.realtimeSinceStartup - pauseBeganAt;
         State = stateBeforePause;
         Time.timeScale = timeScaleBeforePause;
     }

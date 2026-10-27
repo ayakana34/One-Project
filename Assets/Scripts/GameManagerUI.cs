@@ -236,7 +236,7 @@ public partial class GameManager
             Text(b, "보스", 15, Color.white, TextAnchor.MiddleCenter, FontStyle.Bold);
         }
 
-        Text(new Rect(16f, UiHeight - 32f, 700f, 24f), stageJumpKeys ? "R 다시 시작   ·   Esc 메뉴   ·   F1~F4 스테이지 이동" : "R 다시 시작   ·   Esc 메뉴", 14, new Color(1f, 1f, 1f, 0.4f));
+        Text(new Rect(16f, UiHeight - 32f, 700f, 24f), StageJumpEnabled ? "R 다시 시작   ·   Esc 메뉴   ·   F1~F4 스테이지 이동" : "R 다시 시작   ·   Esc 메뉴", 14, new Color(1f, 1f, 1f, 0.4f));
     }
 
     void DrawExitHint(float scale)
@@ -491,7 +491,7 @@ public partial class GameManager
         string[,] rows =
         {
             { "A  D", "좌우 이동" },
-            { "Space", "점프  (S + Space : 발판 아래로)" },
+            { "Space", "점프" },
             { "마우스", "조준" },
             { "좌클릭", "무기 던지기 (던진 뒤에는 직접 주워야 함)" },
             { "Shift / 우클릭", "마우스 방향으로 대쉬" },
